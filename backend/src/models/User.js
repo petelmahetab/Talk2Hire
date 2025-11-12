@@ -10,6 +10,8 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
+      lowercase: true,
+      trim: true,
     },
     profileImage: {
       type: String,
@@ -21,7 +23,10 @@ const userSchema = new mongoose.Schema(
       unique: true,
     },
   },
-  { timestamps: true } // createdAt, updatedAt
+  { 
+    timestamps: true,
+    versionKey: false  // Hides __v if you want cleaner docs
+  }
 );
 
 const User = mongoose.model("User", userSchema);

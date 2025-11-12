@@ -1,5 +1,7 @@
 import { chatClient, streamClient } from "../lib/stream.js";
 import Session from "../models/Session.js";
+import User from "../models/User.js";
+import { requireAuth } from "@clerk/express";
 
 export async function createSession(req, res) {
   try {
@@ -98,7 +100,7 @@ export async function joinSession(req, res) {
     const userId = req.user._id;
     const clerkId = req.user.clerkId;
 
-    const session = await Session.findById(id);
+    const session = await Session.findById(id).populate('participant', 'clerkId');  // Quick populate for check
 
     if (!session) return res.status(404).json({ message: "Session not found" });
 
@@ -110,18 +112,28 @@ export async function joinSession(req, res) {
       return res.status(400).json({ message: "Host cannot join their own session as participant" });
     }
 
-    // check if session is already full - has a participant
-    if (session.participant) return res.status(409).json({ message: "Session is full" });
+    // FIXED: Idempotent check - full if ANY participant, but skip if YOU are already in
+    if (session.participant && session.participant.clerkId !== clerkId) {
+      return res.status(409).json({ message: "Session is full" });
+    }
+    if (session.participant && session.participant.clerkId === clerkId) {
+      console.log(`User ${clerkId} already in session ${id} - skipping add`);
+      return res.status(200).json({ session, message: "Already joined" });
+    }
 
+    // Set participant (only if not already)
     session.participant = userId;
     await session.save();
 
+    // Add to chat (safe - Stream ignores dups)
     const channel = chatClient.channel("messaging", session.callId);
     await channel.addMembers([clerkId]);
 
-    res.status(200).json({ session });
+    console.log(`User ${clerkId} joined session ${id}`);  // Debug
+
+    res.status(200).json({ session, message: "Joined successfully" });
   } catch (error) {
-    console.log("Error in joinSession controller:", error.message);
+    console.error("Error in joinSession:", error);  // Full error
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -162,3 +174,4 @@ export async function endSession(req, res) {
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
+
