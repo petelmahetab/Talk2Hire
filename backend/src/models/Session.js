@@ -31,6 +31,14 @@ const sessionSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    joinToken: {
+      type: String,
+      default: '',
+    },
+    pendingParticipants: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'PendingJoin'
+    }],
   },
   { timestamps: true }
 );

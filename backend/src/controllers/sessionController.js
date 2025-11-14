@@ -1,6 +1,8 @@
 import { chatClient, streamClient } from "../lib/stream.js";
 import Session from "../models/Session.js";
 import User from "../models/User.js";
+import PendingJoin from "../models/PendingJoin.js"; 
+import { clerkClient } from "../lib/clerk.js";
 import { requireAuth } from "@clerk/express";
 
 export async function createSession(req, res) {
@@ -36,7 +38,16 @@ export async function createSession(req, res) {
 
     await channel.create();
 
-    res.status(201).json({ session });
+    const joinToken = crypto.randomBytes(32).toString('hex');
+    session.joinToken = joinToken;
+    await session.save();
+
+    const shareLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/join/${session._id}?token=${joinToken}`;
+
+    console.log(`Session ${session._id} created by ${clerkId}—share: ${shareLink}`);  // Log for debug
+
+    res.status(201).json({ session, shareLink });
+  
   } catch (error) {
     console.log("Error in createSession controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
@@ -93,6 +104,25 @@ export async function getSessionById(req, res) {
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
+export const validateJoinLink = [
+  async (req, res, next) => {
+    const { id, token } = req.params || req.query;  // Flexible for path/query
+    if (!id) return res.status(400).json({ message: "Session ID required" });
+    
+    const session = await Session.findById(id);
+    if (!session || session.status !== 'active') {
+      return res.status(404).json({ message: "Invalid or expired session" });
+    }
+    
+    // Optional token check (skip if using ID-only for dev)
+    if (token && session.joinToken !== token) {
+      return res.status(403).json({ message: "Invalid join token" });
+    }
+    
+    req.sessionId = id;  // Pass to next (sign-in then join)
+    next();
+  }
+];
 
 export async function joinSession(req, res) {
   try {
@@ -129,9 +159,12 @@ export async function joinSession(req, res) {
     const channel = chatClient.channel("messaging", session.callId);
     await channel.addMembers([clerkId]);
 
-    console.log(`User ${clerkId} joined session ${id}`);  // Debug
+    console.log(`User ${clerkId} joined session ${id}`);  
 
-    res.status(200).json({ session, message: "Joined successfully" });
+    res.status(200).json({ 
+      session, 
+      message: "Joined as candidate—your stream live!" 
+    });
   } catch (error) {
     console.error("Error in joinSession:", error);  // Full error
     res.status(500).json({ message: "Internal Server Error" });
@@ -175,3 +208,71 @@ export async function endSession(req, res) {
   }
 }
 
+export async function requestJoin(req, res) {
+  try {
+    const { id } = req.params;
+    const clerkId = req.user.clerkId;
+
+    const session = await Session.findById(id);
+    if (!session || session.status !== 'active') return res.status(400).json({ message: "Invalid session" });
+    if (session.participant) return res.status(409).json({ message: "Room full—try another" });
+
+    // Check existing pending
+    const existing = await PendingJoin.findOne({ sessionId: id, requesterClerkId: clerkId, status: 'pending' });
+    if (existing) return res.status(200).json({ message: "Request pending—await host approval" });
+
+    const fullClerkUser = await clerkClient.users.getUser(clerkId);
+    const pending = await PendingJoin.create({
+      sessionId: id,
+      requesterClerkId: clerkId,
+      requesterName: fullClerkUser.fullName || 'Anonymous',
+      requesterEmail: fullClerkUser.emailAddresses[0]?.emailAddress || '',
+    });
+    session.pendingParticipants.push(pending._id);
+    await session.save();
+
+    // Notify host via Stream chat event (real-time pop-up trigger)
+    const channel = chatClient.channel("messaging", session.callId);
+    await channel.sendMessage({
+      text: `Join request from ${fullClerkUser.fullName} (${fullClerkUser.emailAddresses[0]?.emailAddress})—approve?`,
+      type: 'join_request',
+      custom: { requesterClerkId: clerkId, pendingId: pending._id },
+    });
+console.log(`Request from ${clerkId} for session ${id}—sent to channel ${session.callId}`); 
+    res.status(201).json({ message: "Request sent—host will approve soon" });
+  } catch (error) {
+    console.error("requestJoin:", error);
+    res.status(500).json({ message: "Request failed" });
+  }
+} 
+export async function approveJoin(req, res) {
+  try {
+    const { id, pendingId } = req.params;
+    const userId = req.user._id;  
+
+    const session = await Session.findById(id).populate('host');
+    if (!session || session.host._id.toString() !== userId.toString()) return res.status(403).json({ message: "Only host can approve" });
+
+    const pending = await PendingJoin.findById(pendingId);
+    if (!pending || pending.status !== 'pending') return res.status(400).json({ message: "Invalid request" });
+
+    pending.status = 'approved';
+    await pending.save();
+
+    // Auto-join: Set participant, add to Stream
+    const requesterUser = await User.findOne({ clerkId: pending.requesterClerkId }) || await User.create({ clerkId: pending.requesterClerkId, name: pending.requesterName, email: pending.requesterEmail });
+    session.participant = requesterUser._id;
+    await session.save();
+
+    const channel = chatClient.channel("messaging", session.callId);
+    await channel.addMembers([pending.requesterClerkId]);
+    await channel.sendMessage({ text: `Approved! Welcome to the room, ${pending.requesterName}!` });
+
+    
+console.log(`Approved ${pending.requesterClerkId} for session ${id}—added to channel`);
+    res.status(200).json({ message: "Approved—candidate joining now" });
+  } catch (error) {
+    console.error("approveJoin:", error);
+    res.status(500).json({ message: "Approval failed" });
+  }
+}

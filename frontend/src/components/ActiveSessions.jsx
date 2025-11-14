@@ -9,14 +9,40 @@ import {
 } from "lucide-react";
 import { Link } from "react-router";
 import { getDifficultyBadgeClass } from "../lib/utils";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 function ActiveSessions({ sessions, isLoading, isUserInSession }) {
+  const [shareLink, setShareLink] = useState('');  // State for btn
+  const queryClient = useQueryClient();
+
+  const [problem, setProblem] = useState('Valid Palindrome');  // Form state
+  const [difficulty, setDifficulty] = useState('easy');
+
+  const createMutation = useMutation({
+    mutationFn: ({ problem, difficulty }) =>
+      fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ problem, difficulty }),
+      }).then(r => r.json()),
+    onSuccess: (data) => {
+      alert("Session Created! Share the link below.");
+      setShareLink(data.shareLink);  // Set btn
+      queryClient.invalidateQueries({ queryKey: ['activeSessions'] });
+    },
+    onError: (err) => alert(`Create Failed: ${err.message}`),
+  });
+
+  const handleCreate = () => {
+    if (!problem || !difficulty) return alert("Select problem/difficulty");
+    createMutation.mutate({ problem, difficulty });
+  };
+
   return (
     <div className="lg:col-span-2 card bg-base-100 border-2 border-primary/20 hover:border-primary/30 h-full">
       <div className="card-body">
-        {/* HEADERS SECTION */}
         <div className="flex items-center justify-between mb-6">
-          {/* TITLE AND ICON */}
           <div className="flex items-center gap-3">
             <div className="p-2 bg-gradient-to-br from-primary to-secondary rounded-xl">
               <ZapIcon className="size-5" />
@@ -30,7 +56,43 @@ function ActiveSessions({ sessions, isLoading, isUserInSession }) {
           </div>
         </div>
 
-        {/* SESSIONS LIST */}
+        {/* NEW: Create Form (Above List) */}
+        <div className="mb-4 p-4 bg-base-200 rounded-lg">
+          <h3 className="font-semibold mb-3">Create New Session</h3>
+          <div className="flex gap-3 mb-3">
+            <select value={problem} onChange={(e) => setProblem(e.target.value)} className="select select-bordered flex-1">
+              <option>Valid Palindrome</option>
+              <option>Two Sum</option>
+              <option>Container With Most Water</option>
+            </select>
+            <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className="select select-bordered w-32">
+              <option>easy</option>
+              <option>medium</option>
+              <option>hard</option>
+            </select>
+          </div>
+          <button onClick={handleCreate} disabled={createMutation.isPending} className="btn btn-primary w-full">
+            {createMutation.isPending ? <LoaderIcon className="animate-spin" /> : 'Create Session'}
+          </button>
+        </div>
+
+        {/* Share Link Btn (Post-Create Success) */}
+        {shareLink && (
+          <div className="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
+            <p className="text-sm text-green-700 mb-2">Invite ready—share with candidate!</p>
+            <button 
+              className="btn btn-outline w-full text-sm"
+              onClick={() => {
+                navigator.clipboard.writeText(shareLink);
+                alert("Link Copied!");
+              }}
+            >
+              📤 Copy Share Link: {shareLink.slice(0, 40)}...
+            </button>
+          </div>
+        )}
+
+        {/* Your Existing List JSX (unchanged) */}
         <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
           {isLoading ? (
             <div className="flex items-center justify-center py-20">
@@ -38,12 +100,8 @@ function ActiveSessions({ sessions, isLoading, isUserInSession }) {
             </div>
           ) : sessions.length > 0 ? (
             sessions.map((session) => (
-              <div
-                key={session._id}
-                className="card bg-base-200 border-2 border-base-300 hover:border-primary/50"
-              >
+              <div key={session._id} className="card bg-base-200 border-2 border-base-300 hover:border-primary/50">
                 <div className="flex items-center justify-between gap-4 p-5">
-                  {/* LEFT SIDE */}
                   <div className="flex items-center gap-4 flex-1">
                     <div className="relative size-14 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
                       <Code2Icon className="size-7 text-white" />
@@ -53,13 +111,8 @@ function ActiveSessions({ sessions, isLoading, isUserInSession }) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
                         <h3 className="font-bold text-lg truncate">{session.problem}</h3>
-                        <span
-                          className={`badge badge-sm ${getDifficultyBadgeClass(
-                            session.difficulty
-                          )}`}
-                        >
-                          {session.difficulty.slice(0, 1).toUpperCase() +
-                            session.difficulty.slice(1)}
+                        <span className={`badge badge-sm ${getDifficultyBadgeClass(session.difficulty)}`}>
+                          {session.difficulty.slice(0, 1).toUpperCase() + session.difficulty.slice(1)}
                         </span>
                       </div>
 
@@ -106,4 +159,5 @@ function ActiveSessions({ sessions, isLoading, isUserInSession }) {
     </div>
   );
 }
+
 export default ActiveSessions;
