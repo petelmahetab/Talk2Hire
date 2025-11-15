@@ -31,10 +31,15 @@ export const useMyRecentSessions = () => {
   return result;
 };
 
+// ✅ FIX #1: Extract the session object from the API response
 export const useSessionById = (id) => {
   const result = useQuery({
     queryKey: ["session", id],
-    queryFn: () => sessionApi.getSessionById(id),
+    queryFn: async () => {
+      const response = await sessionApi.getSessionById(id);
+      // API returns { session: {...} }, so extract it
+      return response.session;
+    },
     enabled: !!id,
     refetchInterval: 5000, 
   });

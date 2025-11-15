@@ -6,7 +6,6 @@ let client = null;
 
 export const initializeStreamClient = async (user, token) => {
   // if client exists with same user instead of creating again return it
-
   if (client && client?.user?.id === user.id) return client;
 
   if (client) {
@@ -19,7 +18,20 @@ export const initializeStreamClient = async (user, token) => {
     apiKey,
     user,
     token,
+    options: {
+      // Enable audio and video by default
+      audio: { defaultDeviceId: 'default' },
+      video: { defaultDeviceId: 'default' },
+    },
   });
+
+  // Request permissions immediately
+  try {
+    await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    console.log('Media permissions granted');
+  } catch (error) {
+    console.error('Media permissions denied:', error);
+  }
 
   return client;
 };

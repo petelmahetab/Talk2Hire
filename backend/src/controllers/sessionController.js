@@ -1,9 +1,10 @@
-import { chatClient, streamClient } from "../lib/stream.js";
+import { chatClient } from "../lib/stream.js";
 import Session from "../models/Session.js";
 import User from "../models/User.js";
 import PendingJoin from "../models/PendingJoin.js"; 
 import { clerkClient } from "../lib/clerk.js";
 import { requireAuth } from "@clerk/express";
+import crypto from 'crypto';
 
 export async function createSession(req, res) {
   try {
@@ -21,13 +22,8 @@ export async function createSession(req, res) {
     // create session in db
     const session = await Session.create({ problem, difficulty, host: userId, callId });
 
-    // create stream video call
-    await streamClient.video.call("default", callId).getOrCreate({
-      data: {
-        created_by_id: clerkId,
-        custom: { problem, difficulty, sessionId: session._id.toString() },
-      },
-    });
+    // REMOVED: Video call creation - handle on frontend with @stream-io/video-react-sdk
+    // The frontend will create the call using the token from getStreamToken
 
     // chat messaging
     const channel = chatClient.channel("messaging", callId, {
@@ -44,7 +40,7 @@ export async function createSession(req, res) {
 
     const shareLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/join/${session._id}?token=${joinToken}`;
 
-    console.log(`Session ${session._id} created by ${clerkId}—share: ${shareLink}`);  // Log for debug
+    console.log(`Session ${session._id} created by ${clerkId}—share: ${shareLink}`);
 
     res.status(201).json({ session, shareLink });
   
@@ -104,9 +100,10 @@ export async function getSessionById(req, res) {
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
+
 export const validateJoinLink = [
   async (req, res, next) => {
-    const { id, token } = req.params || req.query;  // Flexible for path/query
+    const { id, token } = req.params || req.query;
     if (!id) return res.status(400).json({ message: "Session ID required" });
     
     const session = await Session.findById(id);
@@ -114,12 +111,11 @@ export const validateJoinLink = [
       return res.status(404).json({ message: "Invalid or expired session" });
     }
     
-    // Optional token check (skip if using ID-only for dev)
     if (token && session.joinToken !== token) {
       return res.status(403).json({ message: "Invalid join token" });
     }
     
-    req.sessionId = id;  // Pass to next (sign-in then join)
+    req.sessionId = id;
     next();
   }
 ];
@@ -130,7 +126,7 @@ export async function joinSession(req, res) {
     const userId = req.user._id;
     const clerkId = req.user.clerkId;
 
-    const session = await Session.findById(id).populate('participant', 'clerkId');  // Quick populate for check
+    const session = await Session.findById(id).populate('participant', 'clerkId');
 
     if (!session) return res.status(404).json({ message: "Session not found" });
 
@@ -142,7 +138,7 @@ export async function joinSession(req, res) {
       return res.status(400).json({ message: "Host cannot join their own session as participant" });
     }
 
-    // FIXED: Idempotent check - full if ANY participant, but skip if YOU are already in
+    // Idempotent check
     if (session.participant && session.participant.clerkId !== clerkId) {
       return res.status(409).json({ message: "Session is full" });
     }
@@ -151,22 +147,21 @@ export async function joinSession(req, res) {
       return res.status(200).json({ session, message: "Already joined" });
     }
 
-    // Set participant (only if not already)
     session.participant = userId;
     await session.save();
 
-    // Add to chat (safe - Stream ignores dups)
+    // Add to chat
     const channel = chatClient.channel("messaging", session.callId);
     await channel.addMembers([clerkId]);
 
-    console.log(`User ${clerkId} joined session ${id}`);  
+    console.log(`User ${clerkId} joined session ${id}`);
 
     res.status(200).json({ 
       session, 
       message: "Joined as candidate—your stream live!" 
     });
   } catch (error) {
-    console.error("Error in joinSession:", error);  // Full error
+    console.error("Error in joinSession:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -180,19 +175,16 @@ export async function endSession(req, res) {
 
     if (!session) return res.status(404).json({ message: "Session not found" });
 
-    // check if user is the host
     if (session.host.toString() !== userId.toString()) {
       return res.status(403).json({ message: "Only the host can end the session" });
     }
 
-    // check if session is already completed
     if (session.status === "completed") {
       return res.status(400).json({ message: "Session is already completed" });
     }
 
-    // delete stream video call
-    const call = streamClient.video.call("default", session.callId);
-    await call.delete({ hard: true });
+    // REMOVED: Video call deletion - frontend will handle ending the call
+    // Just delete the chat channel
 
     // delete stream chat channel
     const channel = chatClient.channel("messaging", session.callId);
@@ -217,7 +209,6 @@ export async function requestJoin(req, res) {
     if (!session || session.status !== 'active') return res.status(400).json({ message: "Invalid session" });
     if (session.participant) return res.status(409).json({ message: "Room full—try another" });
 
-    // Check existing pending
     const existing = await PendingJoin.findOne({ sessionId: id, requesterClerkId: clerkId, status: 'pending' });
     if (existing) return res.status(200).json({ message: "Request pending—await host approval" });
 
@@ -231,24 +222,25 @@ export async function requestJoin(req, res) {
     session.pendingParticipants.push(pending._id);
     await session.save();
 
-    // Notify host via Stream chat event (real-time pop-up trigger)
     const channel = chatClient.channel("messaging", session.callId);
     await channel.sendMessage({
       text: `Join request from ${fullClerkUser.fullName} (${fullClerkUser.emailAddresses[0]?.emailAddress})—approve?`,
       type: 'join_request',
       custom: { requesterClerkId: clerkId, pendingId: pending._id },
     });
-console.log(`Request from ${clerkId} for session ${id}—sent to channel ${session.callId}`); 
+    
+    console.log(`Request from ${clerkId} for session ${id}—sent to channel ${session.callId}`); 
     res.status(201).json({ message: "Request sent—host will approve soon" });
   } catch (error) {
     console.error("requestJoin:", error);
     res.status(500).json({ message: "Request failed" });
   }
 } 
+
 export async function approveJoin(req, res) {
   try {
     const { id, pendingId } = req.params;
-    const userId = req.user._id;  
+    const userId = req.user._id;
 
     const session = await Session.findById(id).populate('host');
     if (!session || session.host._id.toString() !== userId.toString()) return res.status(403).json({ message: "Only host can approve" });
@@ -259,7 +251,6 @@ export async function approveJoin(req, res) {
     pending.status = 'approved';
     await pending.save();
 
-    // Auto-join: Set participant, add to Stream
     const requesterUser = await User.findOne({ clerkId: pending.requesterClerkId }) || await User.create({ clerkId: pending.requesterClerkId, name: pending.requesterName, email: pending.requesterEmail });
     session.participant = requesterUser._id;
     await session.save();
@@ -268,8 +259,7 @@ export async function approveJoin(req, res) {
     await channel.addMembers([pending.requesterClerkId]);
     await channel.sendMessage({ text: `Approved! Welcome to the room, ${pending.requesterName}!` });
 
-    
-console.log(`Approved ${pending.requesterClerkId} for session ${id}—added to channel`);
+    console.log(`Approved ${pending.requesterClerkId} for session ${id}—added to channel`);
     res.status(200).json({ message: "Approved—candidate joining now" });
   } catch (error) {
     console.error("approveJoin:", error);
