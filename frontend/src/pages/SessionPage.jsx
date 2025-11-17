@@ -7,8 +7,7 @@ import { executeCode } from "../lib/piston";
 import Navbar from "../components/Navbar";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { getDifficultyBadgeClass } from "../lib/utils";
-import { Loader2Icon, LogOutIcon, PhoneOffIcon } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import CodeEditorPanel from "../components/CodeEditorPanel";
 import OutputPanel from "../components/OutputPanel";
 import ProblemDescription from "../components/ProblemDescription";
@@ -37,7 +36,11 @@ function SessionPage() {
 
   const { data: sessionData, isLoading: loadingSession, error: sessionError, refetch } = useSessionById(id);
 
-  console.log('📊 Session data:', { hasSession: !!sessionData?.session, loadingSession });
+  // console.log('📊 Session data:', { 
+  //   hasSession: !!sessionData?.session, 
+  //   loadingSession,
+  //   problemTitle: sessionData?.session?.problem 
+  // });
 
   const joinSessionMutation = useJoinSession();
   const endSessionMutation = useEndSession();
@@ -53,12 +56,36 @@ function SessionPage() {
     isParticipant
   );
 
-  // find the problem data based on session problem title
-  const problemData = session?.problem
-    ? Object.values(PROBLEMS).find((p) => p.title === session.problem)
-    : null;
+  // ✅ FIXED: Look up problem by ID (which is now stored in the database)
+  const problemData = (() => {
+    if (!session?.problem) {
+      console.log('❌ No problem in session');
+      return null;
+    }
 
-  console.log('📚 Problem found:', !!problemData, 'Title:', session?.problem);
+    console.log('🔍 Looking for problem:', session.problem);
+
+    // Primary lookup: by ID (e.g., "valid-palindrome")
+    let found = PROBLEMS[session.problem];
+    
+    if (!found) {
+      // Fallback: by id field
+      found = Object.values(PROBLEMS).find((p) => p.id === session.problem);
+    }
+
+    if (!found) {
+      // Backwards compatibility: by title (for old sessions)
+      found = Object.values(PROBLEMS).find((p) => p.title === session.problem);
+    }
+
+    console.log('📚 Problem lookup result:', { 
+      searchTerm: session.problem, 
+      found: !!found,
+      foundTitle: found?.title,
+    });
+
+    return found || null;
+  })();
 
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
   const [code, setCode] = useState("");
@@ -68,6 +95,10 @@ function SessionPage() {
       console.log('📝 Loading starter code for language:', selectedLanguage);
       const starterCode = problemData.starterCode[selectedLanguage];
       setCode(starterCode);
+    } else {
+      console.warn('⚠️ No starter code found for:', selectedLanguage);
+      // Set a default empty template if no starter code
+      setCode(`// ${problemData?.title || 'Problem'}\n// Write your solution here\n\n`);
     }
   }, [problemData, selectedLanguage]);
 
@@ -78,7 +109,6 @@ function SessionPage() {
     joinSessionMutation.mutate(id, { onSuccess: refetch });
   }, [session, user, loadingSession, isHost, isParticipant, id, joinSessionMutation, refetch]);
 
-  // FIXED: Add log for status check
   useEffect(() => {
     if (!session || loadingSession) return;
     
@@ -93,7 +123,7 @@ function SessionPage() {
   const handleLanguageChange = (e) => {
     const newLang = e.target.value;
     setSelectedLanguage(newLang);
-    const starterCode = problemData?.starterCode?.[newLang] || "";
+    const starterCode = problemData?.starterCode?.[newLang] || `// Write your ${newLang} solution here\n\n`;
     setCode(starterCode);
     setOutput(null);
   };
@@ -106,12 +136,10 @@ function SessionPage() {
     setIsRunning(false);
   };
 
-  // FIXED: Sync cleanup before mutate, log onSuccess, force nav
   const handleEndSession = async () => {
     if (confirm("Are you sure you want to end this session? All participants will be notified.")) {
       console.log('🛑 Ending session:', id);
       
-      // NEW: Sync cleanup before backend call (no await hang)
       if (streamClient) {
         try {
           await streamClient.disconnectUser();
@@ -132,8 +160,8 @@ function SessionPage() {
       endSessionMutation.mutate(id, { 
         onSuccess: async () => {
           console.log('✅ Backend end success, navigating to dashboard');
-          await refetch();  // Optional—status update
-          navigate("/dashboard", { replace: true });  // FIXED: replace: true avoids history loop
+          await refetch();
+          navigate("/dashboard", { replace: true });
         },
         onError: (error) => {
           console.error('❌ End session error:', error);
@@ -143,12 +171,10 @@ function SessionPage() {
     }
   };
 
-  // FIXED: Add log to leave
   const handleLeaveSession = () => {
     if (confirm("Are you sure you want to leave this session?")) {
       console.log('👋 Leaving session, cleaning up...');
       
-      // NEW: Cleanup before nav
       if (streamClient) streamClient.disconnectUser().catch(console.error);
       if (chatClient) chatClient.disconnectUser().catch(console.error);
 
@@ -163,7 +189,7 @@ function SessionPage() {
         <Navbar />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <Loader2Icon className="w-12 h-12 mx-auto animate-spin text-primary mb-4" />
+            <Loader2 className="w-12 h-12 mx-auto animate-spin text-primary mb-4" />
             <p className="text-lg">Loading session...</p>
           </div>
         </div>
@@ -171,7 +197,7 @@ function SessionPage() {
     );
   }
 
-  // ERROR STATE
+  // ERROR STATE - Enhanced with problem debugging
   if (!session) {
     return (
       <div className="h-screen bg-base-100 flex flex-col">
@@ -198,6 +224,37 @@ function SessionPage() {
     );
   }
 
+  // 🔧 ADDED: Problem not found error state
+  if (!problemData && session) {
+    return (
+      <div className="h-screen bg-base-100 flex flex-col">
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="card bg-warning/10 shadow-xl max-w-md">
+            <div className="card-body">
+              <h2 className="card-title text-warning">Problem Not Found</h2>
+              <p className="text-base-content/70">
+                The problem "{session.problem}" could not be found in the problems database.
+              </p>
+              <details className="mt-2">
+                <summary className="cursor-pointer text-sm text-base-content/60">Debug Info</summary>
+                <pre className="text-xs mt-2 p-2 bg-base-200 rounded overflow-auto">
+                  Session Problem: {session.problem}
+                  {'\n'}Available Problems: {Object.keys(PROBLEMS).join(', ')}
+                </pre>
+              </details>
+              <div className="card-actions">
+                <button onClick={() => navigate("/dashboard")} className="btn btn-primary btn-sm">
+                  Back to Dashboard
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   console.log('✨ Rendering main content...');
 
   // SUCCESS STATE
@@ -212,24 +269,15 @@ function SessionPage() {
             <PanelGroup direction="vertical">
               {/* PROBLEM DESCRIPTION */}
               <Panel defaultSize={50} minSize={20}>
-                {problemData ? (
-                  <ProblemDescription 
-                    problemData={problemData} 
-                    session={session}
-                    isHost={isHost}
-                    isParticipant={isParticipant}
-                    isEndingSession={endSessionMutation.isPending}
-                    onEndSession={handleEndSession}
-                    onLeaveSession={handleLeaveSession}
-                  />
-                ) : (
-                  <div className="h-full flex items-center justify-center bg-base-200">
-                    <div className="text-center">
-                      <Loader2Icon className="w-8 h-8 animate-spin mx-auto text-primary mb-2" />
-                      <p className="text-base-content/60">Loading problem...</p>
-                    </div>
-                  </div>
-                )}
+                <ProblemDescription 
+                  problemData={problemData} 
+                  session={session}
+                  isHost={isHost}
+                  isParticipant={isParticipant}
+                  isEndingSession={endSessionMutation.isPending}
+                  onEndSession={handleEndSession}
+                  onLeaveSession={handleLeaveSession}
+                />
               </Panel>
 
               <PanelResizeHandle className="h-2 bg-base-300 hover:bg-primary transition-colors cursor-row-resize" />
@@ -239,23 +287,14 @@ function SessionPage() {
                 <PanelGroup direction="vertical">
                   {/* CODE EDITOR */}
                   <Panel defaultSize={70} minSize={30}>
-                    {code ? (
-                      <CodeEditorPanel
-                        selectedLanguage={selectedLanguage}
-                        code={code}
-                        isRunning={isRunning}
-                        onLanguageChange={handleLanguageChange}
-                        onCodeChange={(value) => setCode(value)}
-                        onRunCode={handleRunCode}
-                      />
-                    ) : (
-                      <div className="h-full flex items-center justify-center bg-base-300">
-                        <div className="text-center">
-                          <Loader2Icon className="w-8 h-8 animate-spin mx-auto text-primary mb-2" />
-                          <p className="text-base-content/60">Loading code editor...</p>
-                        </div>
-                      </div>
-                    )}
+                    <CodeEditorPanel
+                      selectedLanguage={selectedLanguage}
+                      code={code}
+                      isRunning={isRunning}
+                      onLanguageChange={handleLanguageChange}
+                      onCodeChange={(value) => setCode(value)}
+                      onRunCode={handleRunCode}
+                    />
                   </Panel>
 
                   <PanelResizeHandle className="h-2 bg-base-300 hover:bg-primary transition-colors cursor-row-resize" />
@@ -277,7 +316,7 @@ function SessionPage() {
               {isInitializingCall ? (
                 <div className="flex-1 flex items-center justify-center">
                   <div className="text-center">
-                    <Loader2Icon className="w-12 h-12 mx-auto animate-spin text-primary mb-4" />
+                    <Loader2 className="w-12 h-12 mx-auto animate-spin text-primary mb-4" />
                     <p className="text-lg">Connecting to video call...</p>
                   </div>
                 </div>
@@ -285,11 +324,8 @@ function SessionPage() {
                 <div className="flex-1 flex items-center justify-center">
                   <div className="card bg-base-100 shadow-xl max-w-md">
                     <div className="card-body items-center text-center">
-                      <div className="w-24 h-24 bg-error/10 rounded-full flex items-center justify-center mb-4">
-                        <PhoneOffIcon className="w-12 h-12 text-error" />
-                      </div>
                       <h2 className="card-title text-2xl">Connection Failed</h2>
-                      <p className="text-base-content/70">Unable to connect to the video call. Check console for logs.</p>
+                      <p className="text-base-content/70">Unable to connect to the video call.</p>
                       <button onClick={() => refetch()} className="btn btn-primary btn-sm mt-4">
                         Retry
                       </button>
@@ -320,7 +356,19 @@ function SessionPage() {
 
 export default function SessionPageWithErrorBoundary() {
   return (
-    <ErrorBoundary fallback={<div className="h-screen flex items-center justify-center text-error">Something went wrong—check console. <button onClick={() => window.location.reload()}>Reload</button></div>}>
+    <ErrorBoundary fallback={
+      <div className="h-screen flex items-center justify-center bg-base-100">
+        <div className="card bg-error/10 shadow-xl max-w-md">
+          <div className="card-body items-center text-center">
+            <h2 className="card-title text-error text-2xl mb-4">Something went wrong</h2>
+            <p className="text-base-content/70 mb-4">Check console for details.</p>
+            <button onClick={() => window.location.reload()} className="btn btn-primary">
+              Reload Page
+            </button>
+          </div>
+        </div>
+      </div>
+    }>
       <SessionPage />
     </ErrorBoundary>
   );

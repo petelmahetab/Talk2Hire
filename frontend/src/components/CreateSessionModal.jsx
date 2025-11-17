@@ -1,4 +1,4 @@
-import { Code2Icon, LoaderIcon, PlusIcon } from "lucide-react";
+import { Code2, Loader, Plus } from "lucide-react";
 import { PROBLEMS } from "../data/problems";
 
 function CreateSessionModal({
@@ -30,11 +30,17 @@ function CreateSessionModal({
               className="select w-full"
               value={roomConfig.problem}
               onChange={(e) => {
-                const selectedProblem = problems.find((p) => p.title === e.target.value);
-                setRoomConfig({
-                  difficulty: selectedProblem.difficulty,
-                  problem: e.target.value,
-                });
+                const selectedProblemId = e.target.value;
+                const selectedProblem = problems.find((p) => p.id === selectedProblemId);
+                
+                if (selectedProblem) {
+                  setRoomConfig({
+                    // ✅ FIX: Send the problem ID, not the title
+                    problem: selectedProblem.id,
+                    // ✅ FIX: Convert difficulty to lowercase to match schema enum
+                    difficulty: selectedProblem.difficulty.toLowerCase(),
+                  });
+                }
               }}
             >
               <option value="" disabled>
@@ -42,7 +48,7 @@ function CreateSessionModal({
               </option>
 
               {problems.map((problem) => (
-                <option key={problem.id} value={problem.title}>
+                <option key={problem.id} value={problem.id}>
                   {problem.title} ({problem.difficulty})
                 </option>
               ))}
@@ -52,11 +58,16 @@ function CreateSessionModal({
           {/* ROOM SUMMARY */}
           {roomConfig.problem && (
             <div className="alert alert-success">
-              <Code2Icon className="size-5" />
+              <Code2 className="size-5" />
               <div>
                 <p className="font-semibold">Room Summary:</p>
                 <p>
-                  Problem: <span className="font-medium">{roomConfig.problem}</span>
+                  Problem: <span className="font-medium">
+                    {problems.find(p => p.id === roomConfig.problem)?.title || roomConfig.problem}
+                  </span>
+                </p>
+                <p>
+                  Difficulty: <span className="font-medium capitalize">{roomConfig.difficulty}</span>
                 </p>
                 <p>
                   Max Participants: <span className="font-medium">2 (1-on-1 session)</span>
@@ -77,9 +88,9 @@ function CreateSessionModal({
             disabled={isCreating || !roomConfig.problem}
           >
             {isCreating ? (
-              <LoaderIcon className="size-5 animate-spin" />
+              <Loader className="size-5 animate-spin" />
             ) : (
-              <PlusIcon className="size-5" />
+              <Plus className="size-5" />
             )}
 
             {isCreating ? "Creating..." : "Create"}
@@ -90,4 +101,5 @@ function CreateSessionModal({
     </div>
   );
 }
+
 export default CreateSessionModal;
