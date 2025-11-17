@@ -8,7 +8,9 @@ function OutputPanel({ output }) {
         {output === null ? (
           <p className="text-base-content/50 text-sm">Click "Run Code" to see the output here...</p>
         ) : output.success ? (
-          <pre className="text-sm font-mono text-success whitespace-pre-wrap">{output.output}</pre>
+          <pre className="text-sm font-mono text-success whitespace-pre-wrap">
+            {output.output}
+          </pre>
         ) : (
           <div>
             {output.output && (
@@ -16,11 +18,14 @@ function OutputPanel({ output }) {
                 {output.output}
               </pre>
             )}
-            <pre className="text-sm font-mono text-error whitespace-pre-wrap">{output.error}</pre>
+            <pre className="text-sm font-mono text-error whitespace-pre-wrap">
+              {output.error}
+            </pre>
           </div>
         )}
       </div>
     </div>
   );
 }
+
 export default OutputPanel;

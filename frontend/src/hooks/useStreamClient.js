@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { StreamChat } from "stream-chat";
 import toast from "react-hot-toast";
 import { initializeStreamClient, disconnectStreamClient } from "../lib/stream";
 import { sessionApi } from "../api/sessions";
+import axiosInstance from "../lib/axios";
 import { useUser } from "@clerk/clerk-react";
 
 function useStreamClient(session, loadingSession, isHost, isParticipant) {
@@ -14,12 +15,10 @@ function useStreamClient(session, loadingSession, isHost, isParticipant) {
   const [channel, setChannel] = useState(null);
   const [isInitializingCall, setIsInitializingCall] = useState(true);
   
-  // Use ref to track if we've already initialized
   const hasInitialized = useRef(false);
   const isInitializing = useRef(false);
 
   useEffect(() => {
-    // Debug: Log all the conditions
     console.log('🔧 useStreamClient conditions:', {
       hasUser: !!user,
       hasCallId: !!session?.callId,
@@ -30,7 +29,6 @@ function useStreamClient(session, loadingSession, isHost, isParticipant) {
       shouldProceed: !!user && !!session?.callId && session?.status !== "completed" && !loadingSession && (isHost || isParticipant),
     });
 
-    // Early exit conditions
     if (!user) {
       console.log('useStreamClient: User not loaded yet');
       setIsInitializingCall(false);
@@ -53,7 +51,6 @@ function useStreamClient(session, loadingSession, isHost, isParticipant) {
       return;
     }
 
-    // Prevent duplicate initialization for same callId
     if (hasInitialized.current === session.callId) {
       console.log('useStreamClient: Already initialized for this callId');
       setIsInitializingCall(false);
@@ -79,28 +76,31 @@ function useStreamClient(session, loadingSession, isHost, isParticipant) {
 
         console.log('Upserting user to Stream:', { userId, userName });
 
-        // Upsert user to Stream backend
-        const upsertResponse = await fetch('/api/chat/upsert-user', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        // ✅ FIX: Use axios instead of fetch
+        try {
+          const upsertResponse = await axiosInstance.post('/chat/upsert-user', {
             id: userId,
             name: userName,
             image: userImage,
-          }),
-        });
-
-        if (!upsertResponse.ok) {
-          throw new Error(`Failed to upsert user: ${upsertResponse.status}`);
+          });
+          console.log('✅ User upserted successfully');
+        } catch (error) {
+          console.warn('⚠️ Upsert failed, continuing:', error.message);
+          // Don't fail the whole init if upsert fails
         }
 
-        console.log('✅ User upserted successfully');
-
         // Token fetch
-        const { token } = await sessionApi.getStreamToken();
+        console.log('📡 Fetching Stream token...');
+        const tokenResponse = await sessionApi.getStreamToken();
+        const { token } = tokenResponse;
         console.log('✅ Token received, length:', token?.length);
 
+        if (!token) {
+          throw new Error('No token received from server');
+        }
+
         // Video Client & Join
+        console.log('🎥 Initializing video client...');
         const client = await initializeStreamClient(
           {
             id: userId,
@@ -116,13 +116,32 @@ function useStreamClient(session, loadingSession, isHost, isParticipant) {
         await videoCall.join({ create: isHost });
         console.log('✅ Video call joined');
         
-        // Enable audio/video
+        // Enable audio/video with proper error handling
         try {
+          console.log('📹 Enabling camera...');
           await videoCall.camera.enable();
-          await videoCall.microphone.enable();
-          console.log('✅ Audio/Video enabled');
+          console.log('✅ Camera enabled');
         } catch (error) {
-          console.warn('⚠️ Could not enable media (might need manual permission):', error.message);
+          console.warn('⚠️ Camera enable failed:', error.message);
+        }
+
+        try {
+          console.log('🎤 Enabling microphone...');
+          await videoCall.microphone.enable();
+          console.log('✅ Microphone enabled');
+        } catch (error) {
+          console.warn('⚠️ Microphone enable failed:', error.message);
+          console.warn('Check browser permissions: Settings > Privacy > Microphone');
+          toast.error('Microphone permission denied. Check browser settings.');
+        }
+
+        // Log device info
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const audioDevices = devices.filter(d => d.kind === 'audioinput');
+          console.log('🎙️ Available audio devices:', audioDevices.map(d => d.label));
+        } catch (e) {
+          console.warn('Could not enumerate devices');
         }
         
         setCall(videoCall);
@@ -131,6 +150,7 @@ function useStreamClient(session, loadingSession, isHost, isParticipant) {
         const apiKey = import.meta.env.VITE_STREAM_API_KEY;
         if (!apiKey) throw new Error("VITE_STREAM_API_KEY missing");
         
+        console.log('💬 Initializing chat client...');
         chatClientInstance = StreamChat.getInstance(apiKey);
 
         await chatClientInstance.connectUser(
@@ -150,7 +170,7 @@ function useStreamClient(session, loadingSession, isHost, isParticipant) {
         setChannel(chatChannel);
         console.log('✅ Chat channel watched');
 
-        hasInitialized.current = session.callId; // Store callId to prevent re-init
+        hasInitialized.current = session.callId;
         console.log('🎉 Stream initialization complete!');
         
       } catch (error) {
@@ -178,13 +198,11 @@ function useStreamClient(session, loadingSession, isHost, isParticipant) {
 
     initCall();
 
-    // Cleanup function - only runs on unmount or callId change
     return () => {
       if (!hasInitialized.current || hasInitialized.current !== session?.callId) return;
       
       console.log('🧹 Cleaning up Stream connections for callId:', hasInitialized.current);
       
-      // Capture current values before cleanup
       const currentCall = call;
       const currentChatClient = chatClient;
       
@@ -207,7 +225,7 @@ function useStreamClient(session, loadingSession, isHost, isParticipant) {
         }
       })();
     };
-  }, [session?.callId, session?.status, isHost, isParticipant, user?.id, loadingSession, call, chatClient]);
+  }, [session?.callId, session?.status, isHost, isParticipant, user?.id, loadingSession]);
 
   return {
     streamClient,

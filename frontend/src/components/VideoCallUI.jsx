@@ -8,11 +8,11 @@ import { Loader2Icon, MessageSquareIcon, UsersIcon, XIcon, CheckIcon, XCircleIco
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Channel, Chat, MessageInput, MessageList, Thread, Window } from "stream-chat-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";  // If error, comment out & use fallback below
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import "@stream-io/video-react-sdk/dist/css/styles.css";
 import "stream-chat-react/dist/css/v2/index.css";
 
-function VideoCallUI({ chatClient, channel, session, isHost }) {  // isHost prop from parent (true for host modal)
+function VideoCallUI({ chatClient, channel, session, isHost }) {
   const navigate = useNavigate();
   const { useCallCallingState, useParticipantCount } = useCallStateHooks();
   const callingState = useCallCallingState();
@@ -21,50 +21,92 @@ function VideoCallUI({ chatClient, channel, session, isHost }) {  // isHost prop
   const [pendingRequest, setPendingRequest] = useState(null);
   const queryClient = useQueryClient();
 
+  // ✅ FIX: Add safety check for session
+  if (!session) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-error">Session data not available</p>
+        </div>
+      </div>
+    );
+  }
+
   // Approve mutation
   const approveMutation = useMutation({
     mutationFn: ({ pendingId }) =>
-      fetch(`/api/sessions/${session._id}/approve/${pendingId}`, { method: 'POST' }).then(r => r.json()),
-    onSuccess: () => { 
-      setPendingRequest(null); 
-      alert("Approved—streams updating! Candidate joining now.");  // Native fallback
-      if (queryClient) queryClient.invalidateQueries(['activeSessions']);
+      fetch(`/api/sessions/${session._id}/approve/${pendingId}`, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      }).then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      }),
+    onSuccess: () => {
+      console.log('✅ Join request approved');
+      setPendingRequest(null);
+      alert("Approved—candidate joining now.");
+      if (queryClient) {
+        queryClient.invalidateQueries({ queryKey: ['activeSessions'] });
+      }
     },
-    onError: (err) => alert(`Approval Failed: ${err.message}`),
+    onError: (err) => {
+      console.error('❌ Approval failed:', err);
+      alert(`Approval Failed: ${err.message}`);
+    },
   });
 
-  // Fallback if TanStack error (uncomment mutationFn above, comment this)
-  // const handleApprove = async (pendingId) => {
-  //   try {
-  //     await fetch(`/api/sessions/${session._id}/approve/${pendingId}`, { method: 'POST' });
-  //     setPendingRequest(null);
-  //     alert("Approved—streams updating!");
-  //   } catch (err) {
-  //     alert(`Approval Failed: ${err.message}`);
-  //   }
-  // };
-
-  // Listen for join requests
+  // ✅ FIX: Proper error handling for channel listener
   useEffect(() => {
-    if (!channel) return;
+    if (!channel) {
+      console.log('⚠️ Channel not available yet');
+      return;
+    }
 
-    const unsubscribe = channel.on('message.new', (event) => {
-      if (event.message.type === 'join_request') {
-        const requesterName = event.message.text.split('from ')[1]?.split('—')[0]?.trim() || 'Unknown';
-        setPendingRequest({ 
-          name: requesterName, 
-          pendingId: event.message.custom.pendingId,
-          requesterClerkId: event.message.custom.requesterClerkId 
-        });
-        alert(`${requesterName} wants to join—check pop-up!`);
+    const handleMessageNew = (event) => {
+      try {
+        if (event.message?.type === 'join_request') {
+          const text = event.message.text || '';
+          const requesterName = text.split('from ')[1]?.split('—')[0]?.trim() || 'Unknown';
+          const pendingId = event.message.custom?.pendingId;
+          const requesterClerkId = event.message.custom?.requesterClerkId;
+
+          if (!pendingId) {
+            console.warn('⚠️ No pendingId in join request');
+            return;
+          }
+
+          console.log('📬 Join request received from:', requesterName);
+          setPendingRequest({
+            name: requesterName,
+            pendingId: pendingId,
+            requesterClerkId: requesterClerkId,
+          });
+          
+          // Only show alert if host
+          if (isHost) {
+            alert(`${requesterName} wants to join—check pop-up!`);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error handling message:', error);
       }
+    };
+
+    // Subscribe to channel events
+    const unsubscribe = channel.on('message.new', handleMessageNew);
+
+    // Watch channel
+    channel.watch().catch(err => {
+      console.error('❌ Error watching channel:', err);
     });
 
-    channel.watch();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [channel, isHost]);
 
-    return () => unsubscribe();
-  }, [channel]);
-
+  // ✅ FIX: Handle joining state
   if (callingState === CallingState.JOINING) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -79,6 +121,7 @@ function VideoCallUI({ chatClient, channel, session, isHost }) {  // isHost prop
   return (
     <div className="h-full flex gap-3 relative str-video">
       <div className="flex-1 flex flex-col gap-3">
+        {/* Participant Count Header */}
         <div className="flex items-center justify-between gap-2 bg-base-100 p-3 rounded-lg shadow">
           <div className="flex items-center gap-2">
             <UsersIcon className="w-5 h-5 text-primary" />
@@ -98,10 +141,12 @@ function VideoCallUI({ chatClient, channel, session, isHost }) {  // isHost prop
           )}
         </div>
 
+        {/* Video Stream */}
         <div className="flex-1 bg-base-300 rounded-lg overflow-hidden relative">
-          <SpeakerLayout />  {/* Distinct streams update here post-approve */}
+          <SpeakerLayout />
         </div>
 
+        {/* Call Controls */}
         <div className="bg-base-100 p-3 rounded-lg shadow flex justify-center">
           <CallControls onLeave={() => navigate("/dashboard")} />
         </div>
@@ -142,7 +187,7 @@ function VideoCallUI({ chatClient, channel, session, isHost }) {  // isHost prop
         </div>
       )}
 
-      {/* Approval Pop-Up Modal (Host-Only via isHost prop) */}
+      {/* Approval Pop-Up Modal (Host-Only) */}
       {pendingRequest && isHost && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-base-100 p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
@@ -151,7 +196,8 @@ function VideoCallUI({ chatClient, channel, session, isHost }) {  // isHost prop
             <div className="flex gap-3 justify-end">
               <button
                 className="btn btn-ghost btn-sm"
-                onClick={() => setPendingRequest(null)}  // Deny
+                onClick={() => setPendingRequest(null)}
+                disabled={approveMutation.isPending}
               >
                 <XCircleIcon className="size-4 mr-1" /> Deny
               </button>
@@ -160,8 +206,17 @@ function VideoCallUI({ chatClient, channel, session, isHost }) {  // isHost prop
                 onClick={() => approveMutation.mutate({ pendingId: pendingRequest.pendingId })}
                 disabled={approveMutation.isPending}
               >
-                {approveMutation.isPending ? <Loader2Icon className="size-4 mr-1 animate-spin" /> : <CheckIcon className="size-4 mr-1" />}
-                Approve
+                {approveMutation.isPending ? (
+                  <>
+                    <Loader2Icon className="size-4 mr-1 animate-spin" />
+                    Approving...
+                  </>
+                ) : (
+                  <>
+                    <CheckIcon className="size-4 mr-1" />
+                    Approve
+                  </>
+                )}
               </button>
             </div>
           </div>
