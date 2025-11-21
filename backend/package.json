@@ -18,8 +18,12 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "inngest": "^3.44.3",
+    "moment-timezone": "^0.6.0",
     "mongoose": "^8.19.1",
-    "stream-chat": "^9.24.0"
+    "node-cron": "^4.2.1",
+    "nodemailer": "^7.0.10",
+    "stream-chat": "^9.24.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
