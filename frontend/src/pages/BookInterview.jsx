@@ -17,7 +17,7 @@ const BookInterview = () => {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [interviewType, setInterviewType] = useState('technical');
   const [step, setStep] = useState(1);
-  
+
   const [formData, setFormData] = useState({
     candidateName: user?.fullName || '',
     candidateEmail: user?.primaryEmailAddress?.emailAddress || '',
@@ -34,22 +34,31 @@ const BookInterview = () => {
   const fetchAvailableSlots = async () => {
     setLoading(true);
     try {
-      const startDate = startOfDay(selectedDate).toISOString();
-      const endDate = addDays(startOfDay(selectedDate), 1).toISOString();
+
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const dateString = `${year}-${month}-${day}`; // e.g. "2025-11-29"
+
+      console.log('Fetching slots for date:', dateString); // Debug
 
       const response = await schedulingApi.getAvailableSlots(
         interviewerId,
-        startDate,
-        endDate,
+        dateString,
+        null,
         Intl.DateTimeFormat().resolvedOptions().timeZone
       );
 
       if (response.success) {
         setAvailableSlots(response.slots);
+        console.log('Slots loaded:', response.slots);
+      } else {
+        setAvailableSlots([]);
       }
     } catch (error) {
       console.error('Error fetching slots:', error);
       alert('Failed to load available slots. Please try again.');
+      setAvailableSlots([]);
     } finally {
       setLoading(false);
     }
@@ -119,11 +128,10 @@ const BookInterview = () => {
             ].map((s, idx) => (
               <React.Fragment key={s.num}>
                 <div
-                  className={`flex items-center justify-center w-12 h-12 rounded-full font-bold ${
-                    step >= s.num
+                  className={`flex items-center justify-center w-12 h-12 rounded-full font-bold ${step >= s.num
                       ? 'bg-indigo-600 text-white'
                       : 'bg-gray-200 text-gray-500'
-                  }`}
+                    }`}
                 >
                   {s.num}
                 </div>
@@ -132,9 +140,8 @@ const BookInterview = () => {
                 </span>
                 {idx < 2 && (
                   <div
-                    className={`h-1 w-16 ${
-                      step > s.num ? 'bg-indigo-600' : 'bg-gray-200'
-                    }`}
+                    className={`h-1 w-16 ${step > s.num ? 'bg-indigo-600' : 'bg-gray-200'
+                      }`}
                   />
                 )}
               </React.Fragment>
@@ -236,7 +243,7 @@ const BookInterview = () => {
                 <input
                   type="text"
                   value={formData.candidateName}
-                  onChange={(e) => setFormData({...formData, candidateName: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, candidateName: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   placeholder="John Doe"
                   required
@@ -250,7 +257,7 @@ const BookInterview = () => {
                 <input
                   type="email"
                   value={formData.candidateEmail}
-                  onChange={(e) => setFormData({...formData, candidateEmail: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, candidateEmail: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   placeholder="john@example.com"
                   required
@@ -264,7 +271,7 @@ const BookInterview = () => {
                 <input
                   type="tel"
                   value={formData.candidatePhone}
-                  onChange={(e) => setFormData({...formData, candidatePhone: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, candidatePhone: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   placeholder="+1 (555) 123-4567"
                 />
@@ -293,7 +300,7 @@ const BookInterview = () => {
                 </label>
                 <textarea
                   value={formData.notes}
-                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   rows="4"
                   placeholder="Any specific topics you'd like to focus on?"

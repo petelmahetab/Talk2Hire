@@ -52,10 +52,33 @@ function DashboardPage() {
       <div className="min-h-screen bg-base-300">
         <Navbar />
         <WelcomeSection onCreateSession={() => setShowCreateModal(true)} />
+<div className="flex gap-4 mt-8">
+        <a
+          href="/availability"
+          className="px-6 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition"
+        >
+          ⚙️ Set My Availability
+        </a>
 
+        <a
+          href="/my-interviews"
+          className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition"
+        >
+          📅 My Interviews
+        </a>
+
+        {/* Example: Book interview with a fake interviewer */}
+        <a
+          href="/book-interview/clerk_user_2abcd1234"  // Replace with real Clerk user ID
+          className="px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition"
+        >
+          📆 Book Mock Interview
+        </a>
+      </div>
         {/* Grid layout */}
         <div className="container mx-auto px-6 pb-16">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
             <StatsCards
               activeSessionsCount={activeSessions.length}
               recentSessionsCount={recentSessions.length}
@@ -79,6 +102,8 @@ function DashboardPage() {
         onCreateRoom={handleCreateRoom}
         isCreating={createSessionMutation.isPending}
       />
+
+      
     </>
   );
 }

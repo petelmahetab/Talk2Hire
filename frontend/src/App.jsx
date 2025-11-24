@@ -7,6 +7,10 @@ import DashboardPage from "./pages/DashboardPage";
 import ProblemPage from "./pages/ProblemPage";
 import ProblemsPage from "./pages/ProblemsPage";
 import SessionPage from "./pages/SessionPage";
+import BookInterview from "./pages/BookInterview.jsx";
+import MyInterviews from "./pages/MyInterviews.jsx";
+import AvailabilitySettings from "./pages/AvailabilitySettings.jsx";
+import RoomPage from "./pages/RoomPage.jsx";
 
 function App() {
   const { isSignedIn, isLoaded } = useUser();
@@ -23,6 +27,11 @@ function App() {
         <Route path="/problems" element={isSignedIn ? <ProblemsPage /> : <Navigate to={"/"} />} />
         <Route path="/problem/:id" element={isSignedIn ? <ProblemPage /> : <Navigate to={"/"} />} />
         <Route path="/session/:id" element={isSignedIn ? <SessionPage /> : <Navigate to={"/"} />} />
+      <Route path="/book-interview/:interviewerId" element={<BookInterview />} />
+        <Route path="/my-interviews" element={<MyInterviews />} />
+        <Route path="/availability" element={<AvailabilitySettings />} />  
+        <Route path="/schedule" element={<AvailabilitySettings />} />
+        <Route path="/room/:id" element={<RoomPage />} />
       </Routes>
 
       <Toaster toastOptions={{ duration: 3000 }} />

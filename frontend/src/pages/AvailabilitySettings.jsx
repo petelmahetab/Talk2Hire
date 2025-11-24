@@ -53,6 +53,7 @@ const AvailabilitySettings = () => {
     setSaving(true);
     try {
       const availabilityData = {
+        interviewerId: user.id,
         interviewerName: user.fullName,
         dayOfWeek: formData.dayOfWeek,
         startTime: formData.startTime,
