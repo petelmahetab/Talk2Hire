@@ -97,36 +97,36 @@ router.post('/availability', async (req, res) => {
   }
 });
 
-router.get('/interviewers', async (req, res) => {
-  try {
-    // Get unique interviewers who have active availability
-    const interviewers = await InterviewerAvailability.aggregate([
-      { $match: { isActive: true } },
-      { 
-        $group: { 
-          _id: '$interviewerId',
-          name: { $first: '$interviewerName' },
-          timezone: { $first: '$timezone' },
-          availableDays: { $addToSet: '$dayOfWeek' }
-        } 
-      },
-      {
-        $project: {
-          _id: 0,
-          interviewerId: '$_id',  // ✅ Map _id to interviewerId
-          name: 1,
-          timezone: 1,
-          availableDays: 1
-        }
-      }
-    ]);
+// router.get('/interviewers', async (req, res) => {
+//   try {
+//     // Get unique interviewers who have active availability
+//     const interviewers = await InterviewerAvailability.aggregate([
+//       { $match: { isActive: true } },
+//       { 
+//         $group: { 
+//           _id: '$interviewerId',
+//           name: { $first: '$interviewerName' },
+//           timezone: { $first: '$timezone' },
+//           availableDays: { $addToSet: '$dayOfWeek' }
+//         } 
+//       },
+//       {
+//         $project: {
+//           _id: 0,
+//           interviewerId: '$_id',  // ✅ Map _id to interviewerId
+//           name: 1,
+//           timezone: 1,
+//           availableDays: 1
+//         }
+//       }
+//     ]);
     
-    res.json({ success: true, interviewers });
-  } catch (error) {
-    console.error('Error fetching interviewers:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
+//     res.json({ success: true, interviewers });
+//   } catch (error) {
+//     console.error('Error fetching interviewers:', error);
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// });
 
 // Get availability
 router.get('/availability/:interviewerId', async (req, res) => {

@@ -12,6 +12,7 @@ import chatRoutes from "./routes/chatRoutes.js";
 import sessionRoutes from "./routes/sessionRoute.js";
 import './jobs/reminderJobs.js';
 import schedulingRoutes from './routes/scheduling.js';
+import interviewersRoutes from './routes/interviewers.js';
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use("/api/inngest", serve({ client: inngest, functions }));
 app.use("/api/chat", chatRoutes);
 app.use("/api/sessions", sessionRoutes);
 app.use('/api/scheduling', schedulingRoutes);
+app.use('/api', interviewersRoutes);
 
 
 app.get("/health", (req, res) => {

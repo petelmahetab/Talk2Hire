@@ -111,15 +111,15 @@ export const schedulingApi = {
   },
 
 
-  getInterviewers: async () => {
-    try {
-      const response = await api.get('/scheduling/interviewers');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching interviewers:', error);
-      throw error.response?.data || error;
-    }
+ getInterviewers: async () => {
+  try {
+    const response = await api.get('/interviewers'); // ← CLEAN PATH
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching interviewers:', error);
+    throw error.response?.data || error;
   }
+},
 
 };
 

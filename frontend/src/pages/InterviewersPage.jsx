@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import schedulingApi from '../api/schedulingApi';
-import { Calendar, Clock, Globe, UserCheck, Sparkles, Users, CalendarDays, CheckCircle2 } from 'lucide-react';
+import { Calendar, Clock, Globe, UserCheck, Sparkles, Users, CalendarDays, CheckCircle2, ArrowLeft } from 'lucide-react';
 
 const InterviewersPage = () => {
   const navigate = useNavigate();
@@ -54,20 +54,35 @@ const InterviewersPage = () => {
 
   return (
     <div className="min-h-screen bg-base-200">
-      {/* Header */}
+      {/* Header with Back Button */}
       <div className="bg-base-100 border-b border-base-300">
-        <div className="max-w-7xl mx-auto px-6 py-12 text-center">
-          <div className="flex justify-center mb-6">
-            <div className="p-4 bg-gradient-to-r from-primary via-secondary to-accent rounded-2xl shadow-2xl">
-              <Users className="w-16 h-16 text-white" />
+        <div className="max-w-7xl mx-auto px-6 py-8 flex items-center justify-between">
+          {/* Back Button */}
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-3 px-6 py-3 bg-primary/10 hover:bg-primary/20 text-primary font-bold rounded-xl transition-all duration-300 group"
+          >
+            <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
+            Back to Dashboard
+          </button>
+
+          {/* Title */}
+          <div className="text-center flex-1">
+            <div className="flex justify-center mb-4">
+              <div className="p-4 bg-gradient-to-r from-primary via-secondary to-accent rounded-2xl shadow-2xl">
+                <Users className="w-16 h-16 text-white" />
+              </div>
             </div>
+            <h1 className="text-5xl font-black bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+              Meet Your Interviewers
+            </h1>
+            <p className="text-xl text-base-content/70 mt-3">
+              Book 1-on-1 mock interviews with experienced developers
+            </p>
           </div>
-          <h1 className="text-5xl font-black bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent mb-4">
-            Meet Your Interviewers
-          </h1>
-          <p className="text-xl text-base-content/70 max-w-3xl mx-auto">
-            Book 1-on-1 mock interviews with experienced developers
-          </p>
+
+          {/* Empty div for spacing */}
+          <div className="w-48"></div>
         </div>
       </div>
 
@@ -107,7 +122,7 @@ const InterviewersPage = () => {
                     </div>
                   </div>
 
-                  {/* REAL AVAILABILITY FROM DB */}
+                  {/* REAL AVAILABILITY */}
                   <div className="space-y-5 mb-8">
                     <div>
                       <div className="flex items-center gap-3 text-base-content/80 mb-3">
@@ -141,7 +156,7 @@ const InterviewersPage = () => {
                               </div>
                               {slot.breakTime?.start && (
                                 <div className="text-xs text-base-content/60 mt-2 ml-8">
-                                  ☕ Break: {formatTime(slot.breakTime.start)} - {formatTime(slot.breakTime.end)}
+                                  Break: {formatTime(slot.breakTime.start)} - {formatTime(slot.breakTime.end)}
                                 </div>
                               )}
                             </div>
@@ -152,7 +167,6 @@ const InterviewersPage = () => {
                       )}
                     </div>
 
-                    {/* Timezone */}
                     {interviewer.timezone && (
                       <div className="flex items-center gap-3 text-base-content/70 pt-4 border-t border-base-300">
                         <Globe className="w-5 h-5 text-accent" />
