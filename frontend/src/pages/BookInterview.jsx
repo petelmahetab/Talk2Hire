@@ -79,8 +79,8 @@ const BookInterview = () => {
     try {
       const bookingData = {
         interviewerId,
-        interviewerName: 'Interviewer Name',
-        interviewerEmail: 'interviewer@example.com',
+        interviewerName: 'Mahetab Patel',
+        interviewerEmail: 'patelmahetab9020@gmail.com',
         candidateName: formData.candidateName,
         candidateEmail: formData.candidateEmail,
         candidatePhone: formData.candidatePhone,

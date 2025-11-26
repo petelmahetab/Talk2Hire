@@ -11,6 +11,9 @@ import BookInterview from "./pages/BookInterview.jsx";
 import MyInterviews from "./pages/MyInterviews.jsx";
 import AvailabilitySettings from "./pages/AvailabilitySettings.jsx";
 import RoomPage from "./pages/RoomPage.jsx";
+import InterviewersPage from "./pages/InterviewersPage.jsx";
+
+
 
 function App() {
   const { isSignedIn, isLoaded } = useUser();
@@ -32,6 +35,8 @@ function App() {
         <Route path="/availability" element={<AvailabilitySettings />} />  
         <Route path="/schedule" element={<AvailabilitySettings />} />
         <Route path="/room/:id" element={<RoomPage />} />
+        <Route path="/interviewers" element={<InterviewersPage />} />
+
       </Routes>
 
       <Toaster toastOptions={{ duration: 3000 }} />

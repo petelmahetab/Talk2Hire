@@ -1,6 +1,7 @@
+// frontend/src/api/schedulingApi.js
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -49,16 +50,6 @@ export const schedulingApi = {
       return response.data;
     } catch (error) {
       console.error('Error fetching interviews:', error);
-      throw error.response?.data || error;
-    }
-  },
-
-  getInterview: async (id) => {
-    try {
-      const response = await api.get(`/scheduling/interview/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching interview:', error);
       throw error.response?.data || error;
     }
   },
@@ -117,7 +108,19 @@ export const schedulingApi = {
       console.error('Error updating interview status:', error);
       throw error.response?.data || error;
     }
+  },
+
+
+  getInterviewers: async () => {
+    try {
+      const response = await api.get('/scheduling/interviewers');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching interviewers:', error);
+      throw error.response?.data || error;
+    }
   }
+
 };
 
 export default schedulingApi;

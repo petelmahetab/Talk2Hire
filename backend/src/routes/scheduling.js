@@ -37,7 +37,7 @@ router.post('/book', async (req, res) => {
       candidateId: req.user?.id || null,
       roomId,
       endTime,
-      meetingLink: `${process.env.CLIENT_URL}/room/${roomId}`
+      meetingLink: `${process.env.CLIENT_URL}/session/${roomId}`
     });
 
     // Send emails
@@ -50,7 +50,7 @@ router.post('/book', async (req, res) => {
   }
 });
 
-// Get my interviews
+// // Get my interviews
 router.get('/my-interviews', async (req, res) => {
   try {
     const userId = req.user?.id;
@@ -93,6 +93,37 @@ router.post('/availability', async (req, res) => {
     res.json({ success: true, availability });
   } catch (error) {
     console.error('Save availability error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/interviewers', async (req, res) => {
+  try {
+    // Get unique interviewers who have active availability
+    const interviewers = await InterviewerAvailability.aggregate([
+      { $match: { isActive: true } },
+      { 
+        $group: { 
+          _id: '$interviewerId',
+          name: { $first: '$interviewerName' },
+          timezone: { $first: '$timezone' },
+          availableDays: { $addToSet: '$dayOfWeek' }
+        } 
+      },
+      {
+        $project: {
+          _id: 0,
+          interviewerId: '$_id',  // ✅ Map _id to interviewerId
+          name: 1,
+          timezone: 1,
+          availableDays: 1
+        }
+      }
+    ]);
+    
+    res.json({ success: true, interviewers });
+  } catch (error) {
+    console.error('Error fetching interviewers:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

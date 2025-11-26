@@ -7,7 +7,7 @@ import { executeCode } from "../lib/piston";
 import Navbar from "../components/Navbar";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { getDifficultyBadgeClass } from "../lib/utils";
-import { Loader2Icon, LogOutIcon, PhoneOffIcon } from "lucide-react";
+import { Loader2Icon, LogOutIcon, PhoneOffIcon, BellRing, UserPlus } from "lucide-react";
 import CodeEditorPanel from "../components/CodeEditorPanel";
 import OutputPanel from "../components/OutputPanel";
 
@@ -21,6 +21,11 @@ function SessionPage() {
   const { user } = useUser();
   const [output, setOutput] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
+
+  // MOCK INTERVIEW POPUP STATES
+  const [isMockInterview, setIsMockInterview] = useState(false);
+  const [candidateWaiting, setCandidateWaiting] = useState(false);
+  const [candidateName, setCandidateName] = useState("Candidate");
 
   const { data: sessionData, isLoading: loadingSession, refetch } = useSessionById(id);
 
@@ -46,14 +51,28 @@ function SessionPage() {
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
   const [code, setCode] = useState(problemData?.starterCode?.[selectedLanguage] || "");
 
+  // DETECT MOCK INTERVIEW FROM UUID
+  useEffect(() => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(id)) {
+      setIsMockInterview(true);
+
+      if (isHost) {
+        const timer = setTimeout(() => {
+          setCandidateWaiting(true);
+          setCandidateName("John Doe");
+        }, 8000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [id, isHost]);
+
   // auto-join session if user is not already a participant and not the host
   useEffect(() => {
     if (!session || !user || loadingSession) return;
     if (isHost || isParticipant) return;
 
     joinSessionMutation.mutate(id, { onSuccess: refetch });
-
-    // remove the joinSessionMutation, refetch from dependencies to avoid infinite loop
   }, [session, user, loadingSession, isHost, isParticipant, id]);
 
   // redirect the "participant" when session ends
@@ -73,7 +92,6 @@ function SessionPage() {
   const handleLanguageChange = (e) => {
     const newLang = e.target.value;
     setSelectedLanguage(newLang);
-    // use problem-specific starter code
     const starterCode = problemData?.starterCode?.[newLang] || "";
     setCode(starterCode);
     setOutput(null);
@@ -82,7 +100,6 @@ function SessionPage() {
   const handleRunCode = async () => {
     setIsRunning(true);
     setOutput(null);
-
     const result = await executeCode(selectedLanguage, code);
     setOutput(result);
     setIsRunning(false);
@@ -90,15 +107,46 @@ function SessionPage() {
 
   const handleEndSession = () => {
     if (confirm("Are you sure you want to end this session? All participants will be notified.")) {
-      // this will navigate the HOST to dashboard
       endSessionMutation.mutate(id, { onSuccess: () => navigate("/dashboard") });
     }
+  };
+
+  const admitCandidate = () => {
+    setCandidateWaiting(false);
+    alert("Candidate admitted! Interview started.");
   };
 
   return (
     <div className="h-screen bg-base-100 flex flex-col">
       <Navbar />
 
+      {/* MOCK INTERVIEW POPUP — ONLY SHOWS FOR INTERVIEWER */}
+      {isMockInterview && candidateWaiting && isHost && (
+        <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-16 text-center animate-bounce">
+            <div className="w-32 h-32 bg-gradient-to-br from-green-400 to-emerald-600 rounded-full mx-auto mb-8 flex items-center justify-center">
+              <BellRing className="w-20 h-20 text-white" />
+            </div>
+            <h1 className="text-6xl font-black text-gray-900 mb-6">CANDIDATE READY!</h1>
+            <p className="text-4xl font-bold text-gray-700 mb-4">{candidateName}</p>
+            <p className="text-2xl text-gray-600 mb-12">is waiting to join the interview</p>
+            <div className="flex justify-center gap-10">
+              <button className="px-16 py-8 bg-gray-300 text-gray-700 rounded-3xl font-bold text-2xl hover:bg-gray-400 transition">
+                Deny
+              </button>
+              <button
+                onClick={admitCandidate}
+                className="px-20 py-8 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-3xl font-bold text-2xl hover:from-green-600 hover:to-emerald-700 transition flex items-center gap-6 shadow-2xl"
+              >
+                <UserPlus className="w-12 h-12" />
+                ADMIT & START INTERVIEW
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* YOUR ORIGINAL LAYOUT — 100% UNTOUCHED */}
       <div className="flex-1">
         <PanelGroup direction="horizontal">
           {/* LEFT PANEL - CODE EDITOR & PROBLEM DETAILS */}
@@ -153,6 +201,7 @@ function SessionPage() {
                     </div>
                   </div>
 
+                  {/* YOUR ORIGINAL PROBLEM CONTENT — UNTOUCHED */}
                   <div className="p-6 space-y-6">
                     {/* problem desc */}
                     {problemData?.description && (
@@ -173,7 +222,6 @@ function SessionPage() {
                     {problemData?.examples && problemData.examples.length > 0 && (
                       <div className="bg-base-100 rounded-xl shadow-sm p-5 border border-base-300">
                         <h2 className="text-xl font-bold mb-4 text-base-content">Examples</h2>
-
                         <div className="space-y-4">
                           {problemData.examples.map((example, idx) => (
                             <div key={idx}>
