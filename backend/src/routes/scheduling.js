@@ -1,6 +1,7 @@
 import express from 'express';
 import InterviewSchedule from '../models/InterviewSchedule.js';
 import InterviewerAvailability from '../models/InterviewerAvailability.js';
+import Session from '../models/Session.js'; 
 import { getAvailableSlots } from '../services/schedulingService.js';
 import { sendInterviewConfirmationEmail } from '../services/emailService.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -29,8 +30,11 @@ router.post('/book', async (req, res) => {
   try {
     const data = req.body;
     const roomId = uuidv4();
+    console.log('🔵 Created roomId:', roomId); // ADD THIS
+    
     const endTime = moment.tz(data.scheduledTime, data.timezone).add(data.duration, 'minutes').toDate();
 
+    // 1. Create InterviewSchedule
     const interview = await InterviewSchedule.create({
       ...data,
       interviewerId: data.interviewerId,
@@ -39,13 +43,25 @@ router.post('/book', async (req, res) => {
       endTime,
       meetingLink: `${process.env.CLIENT_URL}/session/${roomId}`
     });
+    console.log('✅ InterviewSchedule created'); // ADD THIS
 
-    // Send emails
+    // 2. CREATE SESSION DOCUMENT
+    const session = await Session.create({
+      callId: roomId,
+      problem: `Mock Interview - ${data.interviewType || 'Technical'}`,
+      difficulty: 'medium',
+      host: data.interviewerId,
+      status: 'active'
+    });
+    console.log('✅ Session created with callId:', session.callId); // ADD THIS
+
+    // 3. Send emails
     await sendInterviewConfirmationEmail(data.candidateEmail, interview);
     await sendInterviewConfirmationEmail(data.interviewerEmail || 'admin@talk2hire.com', interview);
 
     res.json({ success: true, interview });
   } catch (error) {
+    console.error('❌ Booking error:', error); // ADD THIS
     res.status(500).json({ success: false, message: error.message });
   }
 });

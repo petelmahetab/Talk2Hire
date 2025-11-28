@@ -11,7 +11,7 @@ import ActiveSessions from "../components/ActiveSessions";
 import RecentSessions from "../components/RecentSessions";
 import CreateSessionModal from "../components/CreateSessionModal";
 
-import { Calendar, Users, Settings, Sparkles, ArrowRight, Zap } from 'lucide-react';
+import { Calendar, Users, Settings, Sparkles, Command, Zap,Inbox } from 'lucide-react';
 
 function DashboardPage() {
   const navigate = useNavigate();
@@ -74,7 +74,7 @@ function DashboardPage() {
                 <p className="text-xl text-base-content/70 text-center max-w-xs">
                   Let candidates book mock interviews with you
                 </p>
-                <ArrowRight className="w-12 h-12 text-primary group-hover:translate-x-4 transition-transform" />
+                <Command className="w-12 h-12 text-primary group-hover:translate-x-4 transition-transform" />
               </div>
             </button>
 
@@ -94,7 +94,7 @@ function DashboardPage() {
                 <p className="text-xl text-base-content/70 text-center max-w-xs">
                   View upcoming & past mock interviews
                 </p>
-                <ArrowRight className="w-12 h-12 text-primary group-hover:translate-x-4 transition-transform" />
+                <Inbox className="w-12 h-12 text-primary group-hover:translate-x-4 transition-transform" />
               </div>
             </button>
 

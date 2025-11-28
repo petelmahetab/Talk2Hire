@@ -162,3 +162,20 @@ export async function endSession(req, res) {
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
+
+export async function getSessionByCallId(req, res) {
+  try {
+    const { callId } = req.params;
+console.log("🔍 Looking for session with callId:", callId);
+    const session = await Session.findOne({ callId })
+      .populate("host", "name email profileImage clerkId")
+      .populate("participant", "name email profileImage clerkId");
+
+    if (!session) return res.status(404).json({ message: "Session not found" });
+
+    res.status(200).json({ session });
+  } catch (error) {
+    console.log("Error in getSessionByCallId controller:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
