@@ -1,10 +1,16 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
 import schedulingApi from '../api/schedulingApi';
 import CalendarView from '../components/scheduling/CalendarView';
 import TimeSlotPicker from '../components/scheduling/TimeSlotPicker';
-import { format, addDays, startOfDay } from 'date-fns';
+import toast from 'react-hot-toast';
+import { format } from 'date-fns';
+import {
+  ArrowLeft, Calendar, Clock, User, Mail, Phone, MessageSquare,
+  Sparkles, CheckCircle2, Loader2
+} from 'lucide-react';
 
 const BookInterview = () => {
   const { interviewerId } = useParams();
@@ -17,6 +23,7 @@ const BookInterview = () => {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [interviewType, setInterviewType] = useState('technical');
   const [step, setStep] = useState(1);
+  const [interviewerSchedules, setInterviewerSchedules] = useState([]);
 
   const [formData, setFormData] = useState({
     candidateName: user?.fullName || '',
@@ -26,22 +33,36 @@ const BookInterview = () => {
   });
 
   useEffect(() => {
-    if (interviewerId && selectedDate) {
-      fetchAvailableSlots();
-    }
+    if (interviewerId && selectedDate) fetchAvailableSlots();
   }, [interviewerId, selectedDate]);
+
+  useEffect(() => {
+    const fetchInterviewerSchedules = async () => {
+      try {
+        const response = await schedulingApi.getInterviewers();
+        if (response.success) {
+          const interviewer = response.interviewers.find(
+            (i) => i.interviewerId === interviewerId
+          );
+          if (interviewer) {
+            setInterviewerSchedules(interviewer.schedules || []);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching interviewer schedules:', error);
+      }
+    };
+
+    if (interviewerId) {
+      fetchInterviewerSchedules();
+    }
+  }, [interviewerId]);
+
 
   const fetchAvailableSlots = async () => {
     setLoading(true);
     try {
-
-      const year = selectedDate.getFullYear();
-      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const day = String(selectedDate.getDate()).padStart(2, '0');
-      const dateString = `${year}-${month}-${day}`; // e.g. "2025-11-29"
-
-      console.log('Fetching slots for date:', dateString); // Debug
-
+      const dateString = format(selectedDate, 'yyyy-MM-dd');
       const response = await schedulingApi.getAvailableSlots(
         interviewerId,
         dateString,
@@ -49,15 +70,11 @@ const BookInterview = () => {
         Intl.DateTimeFormat().resolvedOptions().timeZone
       );
 
-      if (response.success) {
-        setAvailableSlots(response.slots);
-        console.log('Slots loaded:', response.slots);
-      } else {
-        setAvailableSlots([]);
-      }
+      if (response.success) setAvailableSlots(response.slots);
+      else setAvailableSlots([]);
     } catch (error) {
-      console.error('Error fetching slots:', error);
-      alert('Failed to load available slots. Please try again.');
+      console.error(error);
+      toast.error('Failed to load slots');
       setAvailableSlots([]);
     } finally {
       setLoading(false);
@@ -65,15 +82,9 @@ const BookInterview = () => {
   };
 
   const handleBooking = async () => {
-    if (!selectedSlot) {
-      alert('Please select a time slot');
-      return;
-    }
-
-    if (!formData.candidateName || !formData.candidateEmail) {
-      alert('Please fill in all required fields');
-      return;
-    }
+    if (!selectedSlot) return toast.error('Please select a time slot');
+    if (!formData.candidateName || !formData.candidateEmail)
+      return toast.error('Name & Email are required');
 
     setLoading(true);
     try {
@@ -91,230 +102,257 @@ const BookInterview = () => {
         notes: formData.notes
       };
 
-      const response = await schedulingApi.bookInterview(bookingData);
-
-      if (response.success) {
-        alert('🎉 Interview booked successfully! Check your email for details.');
+      const res = await schedulingApi.bookInterview(bookingData);
+      if (res.success) {
+        toast.success('🎉 Interview booked! Check your email.');
         navigate('/my-interviews');
-      } else {
-        alert(response.message || 'Failed to book interview');
-      }
-    } catch (error) {
-      console.error('Error booking interview:', error);
-      alert(error.message || 'Failed to book interview. Please try again.');
+      } else toast.error(res.message || 'Booking failed');
+    } catch (err) {
+      toast.error('Something went wrong');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-12 px-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            📅 Schedule Your Interview
-          </h1>
-          <p className="text-lg text-gray-600">
-            Select a convenient time slot for your interview
-          </p>
-        </div>
+    <div className="min-h-screen bg-base-200">
+      {/* Back Button */}
+      <div className="p-6">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 px-5 py-3 bg-primary/10 hover:bg-primary/20 text-primary font-bold rounded-xl transition-all group"
+        >
+          <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+          Back
+        </button>
+      </div>
 
-        <div className="mb-8">
-          <div className="flex items-center justify-center space-x-4">
-            {[
-              { num: 1, label: 'Select Date' },
-              { num: 2, label: 'Choose Time' },
-              { num: 3, label: 'Confirm Details' }
-            ].map((s, idx) => (
-              <React.Fragment key={s.num}>
+      {/* Header */}
+      <div className="text-center mb-10 px-4">
+        <h1 className="text-5xl md:text-6xl font-black bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent mb-3">
+          Schedule Interview
+        </h1>
+        <p className="text-xl text-base-content/70">Pick the perfect time with Mahetab Patel</p>
+      </div>
+
+      {/* Step Indicator */}
+      <div className="max-w-4xl mx-auto px-4 mb-10">
+        <div className="flex items-center justify-center gap-8">
+          {['Select Date', 'Choose Time', 'Confirm Details'].map((label, i) => (
+            <React.Fragment key={i}>
+              <div className="flex items-center gap-4">
                 <div
-                  className={`flex items-center justify-center w-12 h-12 rounded-full font-bold ${step >= s.num
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 text-gray-500'
+                  className={`w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold transition-all ${step > i
+                    ? 'bg-gradient-to-r from-primary to-secondary text-white shadow-xl'
+                    : step === i + 1
+                      ? 'bg-gradient-to-r from-primary to-accent text-white shadow-xl ring-4 ring-primary/30'
+                      : 'bg-base-300 text-base-content/50'
                     }`}
                 >
-                  {s.num}
+                  {step > i ? <CheckCircle2 className="w-8 h-8" /> : i + 1}
                 </div>
-                <span className={`text-sm ${step >= s.num ? 'text-indigo-600' : 'text-gray-500'}`}>
-                  {s.label}
+                <span className={`text-lg font-bold ${step >= i + 1 ? 'text-primary' : 'text-base-content/50'}`}>
+                  {label}
                 </span>
-                {idx < 2 && (
-                  <div
-                    className={`h-1 w-16 ${step > s.num ? 'bg-indigo-600' : 'bg-gray-200'
-                      }`}
-                  />
-                )}
-              </React.Fragment>
-            ))}
-          </div>
+              </div>
+              {i < 2 && <div className={`w-24 h-1 ${step > i + 1 ? 'bg-primary' : 'bg-base-300'}`} />}
+            </React.Fragment>
+          ))}
         </div>
+      </div>
 
+      <div className="max-w-5xl mx-auto px-4 pb-12">
+        {/* Step 1 - Calendar */}
         {step === 1 && (
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              Select a Date
+          <div className="bg-base-100 rounded-3xl shadow-2xl border border-base-300 p-8">
+            <h2 className="text-3xl font-black text-center mb-8 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Pick a Date
             </h2>
             <CalendarView
               events={[]}
-              onSelectSlot={(slotInfo) => {
-                setSelectedDate(slotInfo.start);
+              selectedDate={selectedDate}
+              availableSlots={availableSlots}
+              interviewerSchedules={interviewerSchedules}
+              onSelectSlot={(slot) => {
+                setSelectedDate(slot.start);
                 setStep(2);
               }}
             />
           </div>
         )}
 
+        {/* Step 2 - Time Slots */}
         {step === 2 && (
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <div className="flex items-center justify-between mb-6">
+          <div className="bg-base-100 rounded-3xl shadow-2xl border border-base-300 p-8">
+            <div className="flex justify-between items-center mb-8">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">
-                  Select Time
+                <h2 className="text-3xl font-black bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                  Choose Time
                 </h2>
-                <p className="text-gray-600 mt-1">
+                <p className="text-xl text-base-content/70 mt-2">
                   {format(selectedDate, 'EEEE, MMMM d, yyyy')}
                 </p>
               </div>
               <button
                 onClick={() => setStep(1)}
-                className="text-indigo-600 hover:text-indigo-800 font-medium"
+                className="text-primary hover:text-secondary font-bold flex items-center gap-2"
               >
-                ← Change Date
+                <ArrowLeft className="w-5 h-5" /> Change Date
               </button>
             </div>
 
-            <TimeSlotPicker
-              slots={availableSlots}
-              selectedSlot={selectedSlot}
-              onSelectSlot={setSelectedSlot}
-              loading={loading}
-            />
+            {loading ? (
+              <div className="text-center py-20">
+                <Loader2 className="w-16 h-16 animate-spin text-primary mx-auto" />
+              </div>
+            ) : (
+              <TimeSlotPicker
+                slots={availableSlots}
+                selectedSlot={selectedSlot}
+                onSelectSlot={setSelectedSlot}
+                loading={loading}
+              />
+            )}
 
             {selectedSlot && (
-              <div className="mt-8 flex justify-center">
+              <div className="mt-10 text-center">
                 <button
                   onClick={() => setStep(3)}
-                  className="px-8 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+                  className="px-12 py-5 bg-gradient-to-r from-primary to-accent text-white text-xl font-bold rounded-2xl hover:shadow-2xl transition-all flex items-center gap-3 mx-auto"
                 >
-                  Continue to Details →
+                  Continue <Sparkles className="w-6 h-6" />
                 </button>
               </div>
             )}
           </div>
         )}
 
+        {/* Step 3 - Confirm Details */}
         {step === 3 && (
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">
-                Confirm Your Details
+          <div className="bg-base-100 rounded-3xl shadow-2xl border border-base-300 p-8">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-3xl font-black bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Confirm Booking
               </h2>
               <button
                 onClick={() => setStep(2)}
-                className="text-indigo-600 hover:text-indigo-800 font-medium"
+                className="text-primary hover:text-secondary font-bold flex items-center gap-2"
               >
-                ← Change Time
+                <ArrowLeft className="w-5 h-5" /> Change Time
               </button>
             </div>
 
-            <div className="bg-indigo-50 rounded-xl p-6 mb-8">
-              <h3 className="font-semibold text-gray-900 mb-4">Interview Details</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">📅 Date:</span>
-                  <span className="font-medium">{format(selectedDate, 'EEEE, MMMM d, yyyy')}</span>
+            {/* Summary Card */}
+            <div className="bg-gradient-to-r from-primary/10 to-accent/10 rounded-2xl p-8 mb-10 border border-primary/20">
+              <h3 className="text-2xl font-bold mb-6 flex items-center gap-3">
+                <Calendar className="w-8 h-8 text-primary" /> Interview Summary
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-lg">
+                <div className="flex items-center gap-4">
+                  <Clock className="w-7 h-7 text-primary" />
+                  <div>
+                    <p className="text-base-content/70">Time</p>
+                    <p className="font-bold">{format(new Date(selectedSlot.start), 'h:mm a')}</p>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">⏰ Time:</span>
-                  <span className="font-medium">{format(new Date(selectedSlot.start), 'h:mm a')}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">⏱️ Duration:</span>
-                  <span className="font-medium">{selectedSlot.duration} minutes</span>
+                <div className="flex items-center gap-4">
+                  <Calendar className="w-7 h-7 text-primary" />
+                  <div>
+                    <p className="text-base-content/70">Date</p>
+                    <p className="font-bold">{format(selectedDate, 'EEEE, MMMM d, yyyy')}</p>
+                  </div>
                 </div>
               </div>
             </div>
 
+            {/* Form */}
             <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  value={formData.candidateName}
-                  onChange={(e) => setFormData({ ...formData, candidateName: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="John Doe"
-                  required
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="flex items-center gap-3 text-lg font-bold mb-3">
+                    <User className="w-6 h-6 text-primary" /> Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.candidateName}
+                    onChange={(e) => setFormData({ ...formData, candidateName: e.target.value })}
+                    className="input input-bordered input-primary w-full text-lg"
+                    placeholder="John Doe"
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-3 text-lg font-bold mb-3">
+                    <Mail className="w-6 h-6 text-primary" /> Email *
+                  </label>
+                  <input
+                    type="email"
+                    value={formData.candidateEmail}
+                    onChange={(e) => setFormData({ ...formData, candidateEmail: e.target.value })}
+                    className="input input-bordered input-primary w-full text-lg"
+                    placeholder="john@example.com"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  value={formData.candidateEmail}
-                  onChange={(e) => setFormData({ ...formData, candidateEmail: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="john@example.com"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone Number (Optional)
+                <label className="flex items-center gap-3 text-lg font-bold mb-3">
+                  <Phone className="w-6 h-6 text-primary" /> Phone (Optional)
                 </label>
                 <input
                   type="tel"
                   value={formData.candidatePhone}
                   onChange={(e) => setFormData({ ...formData, candidatePhone: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="input input-bordered input-primary w-full text-lg"
                   placeholder="+1 (555) 123-4567"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Interview Type
+                <label className="flex items-center gap-3 text-lg font-bold mb-3">
+                  <Briefcase className="w-6 h-6 text-primary" /> Interview Type
                 </label>
                 <select
                   value={interviewType}
                   onChange={(e) => setInterviewType(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="select select-primary w-full text-lg"
                 >
                   <option value="technical">💻 Technical Interview</option>
                   <option value="coding">🔧 Coding Round</option>
                   <option value="system-design">📐 System Design</option>
-                  <option value="behavioral">🗣️ Behavioral Interview</option>
-                  <option value="general">📋 General Interview</option>
+                  <option value="behavioral">🗣️ Behavioral</option>
+                  <option value="general">📋 General</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Additional Notes (Optional)
+                <label className="flex items-center gap-3 text-lg font-bold mb-3">
+                  <MessageSquare className="w-6 h-6 text-primary" /> Notes (Optional)
                 </label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  rows="4"
-                  placeholder="Any specific topics you'd like to focus on?"
+                  rows={4}
+                  className="textarea textarea-primary w-full text-lg"
+                  placeholder="Anything specific you'd like to cover?"
                 />
               </div>
             </div>
 
-            <div className="mt-8 flex gap-4">
+            <div className="mt-10 text-center">
               <button
                 onClick={handleBooking}
                 disabled={loading}
-                className="flex-1 px-8 py-4 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn btn-primary btn-wide text-xl font-bold flex items-center gap-3 mx-auto"
               >
-                {loading ? '⏳ Booking...' : '✅ Confirm Booking'}
+                {loading ? (
+                  <>
+                    <Loader2 className="w-6 h-6 animate-spin" /> Booking...
+                  </>
+                ) : (
+                  <>
+                    Confirm & Book <Sparkles className="w-6 h-6" />
+                  </>
+                )}
               </button>
             </div>
           </div>
