@@ -1,4 +1,3 @@
-// frontend/src/api/schedulingApi.js
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -11,6 +10,9 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
+  if (config.url?.includes('/clerk.') || config.url?.includes('clerk.com')) {
+    return config;
+  }
   const token = sessionStorage.getItem('clerk-token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -110,17 +112,15 @@ export const schedulingApi = {
     }
   },
 
-
- getInterviewers: async () => {
-  try {
-    const response = await api.get('/interviewers'); // ← CLEAN PATH
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching interviewers:', error);
-    throw error.response?.data || error;
-  }
-},
-
+  getInterviewers: async () => {
+    try {
+      const response = await api.get('/interviewers');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching interviewers:', error);
+      throw error.response?.data || error;
+    }
+  },
 };
 
 export default schedulingApi;

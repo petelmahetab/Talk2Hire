@@ -11,10 +11,9 @@ const sessionSchema = new mongoose.Schema(
       enum: ["easy", "medium", "hard"],
       required: true,
     },
-    host: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
+    hostClerkId: {
+      type: String,
+      required: true
     },
     participant: {
       type: mongoose.Schema.Types.ObjectId,

@@ -9,26 +9,61 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-export const sendInterviewConfirmationEmail = async (to, interview) => {
-  const candidateTime = moment(interview.scheduledTime).tz(interview.timezone);
-  const interviewerTime = moment(interview.scheduledTime).tz(interview.timezone);
+export const sendInterviewConfirmationEmail = async (to, interview, recipientType) => {
+  // recipientType = 'candidate' or 'interviewer'
+  const isCandidate = recipientType === 'candidate';
+  const recipientName = isCandidate ? interview.candidateName : interview.interviewerName;
+  const recipientTimezone = isCandidate ? interview.candidateTimezone : interview.interviewerTimezone;
+
+  // Fallback to interview.timezone if individual not set
+  const displayTimezone = recipientTimezone || interview.timezone || 'Asia/Kolkata';
+
+  const localTime = moment(interview.scheduledTime).tz(displayTimezone);
 
   const mailOptions = {
     from: `"Talk2Hire" <${process.env.EMAIL_USER}>`,
-    to: to,
-    subject: `🎯 Mock Interview Confirmed - ${candidateTime.format('MMMM Do, YYYY [at] h:mm A')}`,
+    to,
+    subject: `Mock Interview Confirmed - ${localTime.format('dddd, MMM Do [at] h:mm A z')}`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 12px;">
-        <h2 style="color: #4f46e5;">🎉 Interview Scheduled Successfully!</h2>
-        <p>Hello <strong>${to === interview.candidateEmail ? interview.candidateName : interview.interviewerName}</strong>,</p>
-        <div style="background: #f8f9ff; padding: 16px; border-radius: 8px; margin: 16px 0;">
-          <p><strong>📅 Date:</strong> ${candidateTime.format('dddd, MMMM Do, YYYY')}</p>
-          <p><strong>⏰ Time:</strong> ${candidateTime.format('h:mm A')} (${interview.timezone})</p>
-          <p><strong>⏱ Duration:</strong> ${interview.duration} minutes</p>
-          <p><strong>💼 Type:</strong> ${interview.interviewType.replace('-', ' ').toUpperCase()}</p>
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 24px; background: #ffffff; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid #e0e0e0;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #4f46e5; font-size: 28px;">Interview Scheduled Successfully!</h1>
         </div>
-        ${interview.meetingLink ? `<p><a href="${interview.meetingLink}" style="background:#10b981; color:white; padding:12px 24px; text-decoration:none; border-radius:8px;">Join Interview Room 🚀</a></p>` : ''}
-        <p>See you soon!<br/>— The Talk2Hire Team</p>
+
+        <p style="font-size: 18px; color: #1f2937;">Hello <strong>${recipientName.split(' ')[0]}</strong> 👋,</p>
+        
+        <p style="font-size: 16px; color: #374151;">
+          ${isCandidate 
+            ? `Your mock interview with <strong>${interview.interviewerName}</strong> is confirmed!`
+            : `You have a mock interview scheduled with <strong>${interview.candidateName}</strong>!`
+          }
+        </p>
+
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; margin: 24px 0;">
+          <p style="margin: 8px 0; font-size: 16px;"><strong>📅 Date:</strong> ${localTime.format('dddd, MMMM Do, YYYY')}</p>
+          <p style="margin: 8px 0; font-size: 16px;"><strong>🕐 Time:</strong> ${localTime.format('h:mm A')} <small>(${displayTimezone.replace('_', ' ')})</small></p>
+          <p style="margin: 8px 0; font-size: 16px;"><strong>⏱ Duration:</strong> ${interview.duration} minutes</p>
+          <p style="margin: 8px 0; font-size: 16px;"><strong>💼 Type:</strong> ${interview.interviewType.toUpperCase()}</p>
+        </div>
+
+        ${interview.meetingLink ? `
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${interview.meetingLink}" style="background:#10b981; color:white; padding:16px 32px; text-decoration:none; border-radius:12px; font-weight:bold; font-size:18px; display:inline-block;">
+              Join Interview Room 🚀
+            </a>
+          </div>
+        ` : ''}
+
+        <hr style="border: 1px dashed #e5e7eb; margin: 32px 0;">
+
+        <p style="color: #6b7280; font-size: 14px;">
+          ${isCandidate 
+            ? "Pro tip: Join 5 minutes early and test your mic/camera!"
+            : "Get ready to grill them hard! 😈"
+          }
+        </p>
+
+        <p style="color: #6b7280;">See you soon!<br/><strong>— The Talk2Hire Team</strong></p>
       </div>
     `
   };
@@ -36,22 +71,36 @@ export const sendInterviewConfirmationEmail = async (to, interview) => {
   await transporter.sendMail(mailOptions);
 };
 
-export const sendReminderEmail = async (to, name, interview, type = '1 hour') => {
-  const time = moment(interview.scheduledTime).tz(interview.timezone);
+export const sendReminderEmail = async (to, name, interview, minutesBefore = 5) => {
+  const recipientTimezone = interview.candidateTimezone || interview.interviewerTimezone || interview.timezone;
+  const time = moment(interview.scheduledTime).tz(recipientTimezone);
+
   await transporter.sendMail({
     from: `"Talk2Hire" <${process.env.EMAIL_USER}>`,
     to,
-    subject: `⏰ Reminder: Your Mock Interview in ${type}`,
+    subject: `⏰ Reminder: Mock Interview in ${minutesBefore} minutes!`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 12px;">
-        <h2 style="color: #f59e0b;">⏰ Reminder: Upcoming Mock Interview</h2>
-        <p>Hi ${name},</p>
-        <p>Your interview is coming up in <strong>${type}</strong>!</p>
-        <div style="background: #fff7ed; padding: 16px; border-radius: 8px;">
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: auto; padding: 24px; background: #fff7ed; border-radius: 16px; border: 2px solid #f59e0b;">
+        <h2 style="color: #d97706; text-align: center;">⏰ Interview Starting Soon!</h2>
+        <p style="font-size: 18px;">Hi ${name.split(' ')[0]},</p>
+        <p style="font-size: 16px;">Your mock interview starts in <strong>${minutesBefore} minutes</strong>!</p>
+
+        <div style="background: #fef3c7; padding: 16px; border-radius: 12px; margin: 20px 0;">
           <p><strong>Date:</strong> ${time.format('dddd, MMMM Do, YYYY')}</p>
-          <p><strong>Time:</strong> ${time.format('h:mm A')} (${interview.timezone})</p>
+          <p><strong>Time:</strong> ${time.format('h:mm A')} (${recipientTimezone.replace('_', ' ')})</p>
         </div>
-        ${interview.meetingLink ? `<p><a href="${interview.meetingLink}" style="background:#10b981; color:white; padding:12px 24px; text-decoration:none; border-radius:8px;">Join Now 🚀</a></p>` : ''}
+
+        ${interview.meetingLink ? `
+          <div style="text-align: center;">
+            <a href="${interview.meetingLink}" style="background:#ef4444; color:white; padding:16px 32px; text-decoration:none; border-radius:12px; font-weight:bold; font-size:18px;">
+              Join Now 🔥
+            </a>
+          </div>
+        ` : ''}
+
+        <p style="text-align: center; margin-top: 24px; color: #92400e;">
+          Don't keep them waiting! 😉
+        </p>
       </div>
     `
   });

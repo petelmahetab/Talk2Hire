@@ -3,7 +3,8 @@ import InterviewSchedule from '../models/InterviewSchedule.js';
 import InterviewerAvailability from '../models/InterviewerAvailability.js';
 import Session from '../models/Session.js'; 
 import { getAvailableSlots } from '../services/schedulingService.js';
-import { sendInterviewConfirmationEmail } from '../services/emailService.js';
+// import { sendInterviewConfirmationEmail } from '../services/emailService.js';
+import { sendBookingConfirmationEmails } from '../utils/sendEmails.js';
 import { v4 as uuidv4 } from 'uuid';
 import moment from 'moment-timezone';
 
@@ -30,7 +31,7 @@ router.post('/book', async (req, res) => {
   try {
     const data = req.body;
     const roomId = uuidv4();
-    console.log('🔵 Created roomId:', roomId); // ADD THIS
+    console.log('Created roomId:', roomId); 
     
     const endTime = moment.tz(data.scheduledTime, data.timezone).add(data.duration, 'minutes').toDate();
 
@@ -43,25 +44,24 @@ router.post('/book', async (req, res) => {
       endTime,
       meetingLink: `${process.env.CLIENT_URL}/session/${roomId}`
     });
-    console.log('✅ InterviewSchedule created'); // ADD THIS
+    console.log('InterviewSchedule created');
 
     // 2. CREATE SESSION DOCUMENT
     const session = await Session.create({
       callId: roomId,
       problem: `Mock Interview - ${data.interviewType || 'Technical'}`,
       difficulty: 'medium',
-      host: data.interviewerId,
+      hostClerkId: data.interviewerId,
       status: 'active'
     });
-    console.log('✅ Session created with callId:', session.callId); // ADD THIS
+    console.log('Session created with callId:', session.callId);
 
-    // 3. Send emails
-    await sendInterviewConfirmationEmail(data.candidateEmail, interview);
-    await sendInterviewConfirmationEmail(data.interviewerEmail || 'admin@talk2hire.com', interview);
+    // 3. SEND THE NEW GORGEOUS EMAILS
+    await sendBookingConfirmationEmails(interview.toObject());
 
     res.json({ success: true, interview });
   } catch (error) {
-    console.error('❌ Booking error:', error); // ADD THIS
+    console.error('Booking error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

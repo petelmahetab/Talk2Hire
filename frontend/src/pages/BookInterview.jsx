@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
@@ -9,7 +8,7 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import {
   ArrowLeft, Calendar, Clock, User, Mail, Phone, MessageSquare,
-  Sparkles, CheckCircle2, Loader2
+  Sparkles, CheckCircle2, Loader2, Briefcase 
 } from 'lucide-react';
 
 const BookInterview = () => {
@@ -26,11 +25,29 @@ const BookInterview = () => {
   const [interviewerSchedules, setInterviewerSchedules] = useState([]);
 
   const [formData, setFormData] = useState({
-    candidateName: user?.fullName || '',
-    candidateEmail: user?.primaryEmailAddress?.emailAddress || '',
-    candidatePhone: '',
+    candidateName: '',
+    candidateEmail: '',
+    candidatePhone: '+91 ',
     notes: ''
   });
+
+  // Format phone number as user types
+  const handlePhoneChange = (e) => {
+    let value = e.target.value;
+    
+    // Ensure it always starts with +91
+    if (!value.startsWith('+91')) {
+      value = '+91 ' + value.replace(/^\+91\s*/, '');
+    }
+    
+    // Remove non-numeric characters after +91
+    const numbers = value.slice(4).replace(/\D/g, '');
+    
+    // Limit to 10 digits
+    if (numbers.length <= 10) {
+      setFormData({ ...formData, candidatePhone: '+91 ' + numbers });
+    }
+  };
 
   useEffect(() => {
     if (interviewerId && selectedDate) fetchAvailableSlots();
@@ -57,7 +74,6 @@ const BookInterview = () => {
       fetchInterviewerSchedules();
     }
   }, [interviewerId]);
-
 
   const fetchAvailableSlots = async () => {
     setLoading(true);
@@ -86,6 +102,12 @@ const BookInterview = () => {
     if (!formData.candidateName || !formData.candidateEmail)
       return toast.error('Name & Email are required');
 
+    // Validate phone number (should be +91 followed by 10 digits)
+    const phoneDigits = formData.candidatePhone.replace(/\D/g, '').slice(2); // Remove +91
+    if (formData.candidatePhone.trim() !== '+91' && phoneDigits.length > 0 && phoneDigits.length !== 10) {
+      return toast.error('Phone number must be 10 digits');
+    }
+
     setLoading(true);
     try {
       const bookingData = {
@@ -94,7 +116,7 @@ const BookInterview = () => {
         interviewerEmail: 'patelmahetab9020@gmail.com',
         candidateName: formData.candidateName,
         candidateEmail: formData.candidateEmail,
-        candidatePhone: formData.candidatePhone,
+        candidatePhone: formData.candidatePhone.trim() === '+91' ? '' : formData.candidatePhone,
         scheduledTime: selectedSlot.start,
         duration: selectedSlot.duration,
         interviewType,
@@ -277,7 +299,7 @@ const BookInterview = () => {
                     value={formData.candidateName}
                     onChange={(e) => setFormData({ ...formData, candidateName: e.target.value })}
                     className="input input-bordered input-primary w-full text-lg"
-                    placeholder="John Doe"
+                    placeholder="Enter candidate name"
                   />
                 </div>
                 <div>
@@ -289,22 +311,26 @@ const BookInterview = () => {
                     value={formData.candidateEmail}
                     onChange={(e) => setFormData({ ...formData, candidateEmail: e.target.value })}
                     className="input input-bordered input-primary w-full text-lg"
-                    placeholder="john@example.com"
+                    placeholder="Enter candidate email"
                   />
                 </div>
               </div>
 
               <div>
                 <label className="flex items-center gap-3 text-lg font-bold mb-3">
-                  <Phone className="w-6 h-6 text-primary" /> Phone (Optional)
+                  <Phone className="w-6 h-6 text-primary" /> Phone Number (Optional)
                 </label>
                 <input
                   type="tel"
                   value={formData.candidatePhone}
-                  onChange={(e) => setFormData({ ...formData, candidatePhone: e.target.value })}
+                  onChange={handlePhoneChange}
                   className="input input-bordered input-primary w-full text-lg"
-                  placeholder="+1 (555) 123-4567"
+                  placeholder="+91 9876543210"
+                  maxLength={14}
                 />
+                <p className="text-sm text-base-content/60 mt-2">
+                  Format: +91 followed by 10 digits
+                </p>
               </div>
 
               <div>
@@ -333,7 +359,7 @@ const BookInterview = () => {
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   rows={4}
                   className="textarea textarea-primary w-full text-lg"
-                  placeholder="Anything specific you'd like to cover?"
+                  placeholder="Any specific topics you'd like to discuss or prepare for?"
                 />
               </div>
             </div>
