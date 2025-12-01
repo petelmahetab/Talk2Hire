@@ -228,19 +228,44 @@ const BookInterview = () => {
                 <Loader2 className="w-16 h-16 animate-spin text-primary mx-auto" />
               </div>
             ) : (
-              <TimeSlotPicker
-                slots={availableSlots}
-                selectedSlot={selectedSlot}
-                onSelectSlot={setSelectedSlot}
-                loading={loading}
-              />
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {availableSlots.length === 0 ? (
+                  <div className="col-span-full text-center py-12">
+                    <Clock className="w-16 h-16 text-base-content/30 mx-auto mb-4" />
+                    <p className="text-xl text-base-content/60">No slots available for this date</p>
+                  </div>
+                ) : (
+                  availableSlots.map((slot, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setSelectedSlot(slot)}
+                      className={`p-4 rounded-xl border-2 transition-all ${
+                        selectedSlot?.start === slot.start
+                          ? 'bg-gradient-to-br from-primary via-secondary to-accent border-transparent shadow-2xl color-black shadow-primary-20/10 scale-105'
+                          : 'bg-gradient-to-brrom-primary via-secondary to-accent hover:border-primary-500/50 hover:shadow-lg hover:shadow-white-500/20'
+                      }`}
+                    >
+                      <p className={`text-xl font-black ${
+                        selectedSlot?.start === slot.start ? 'text-black' : 'text-white'
+                      }`}>
+                        {format(new Date(slot.start), 'h:mm a')}
+                      </p>
+                      <p className={`text-sm mt-1 ${
+                        selectedSlot?.start === slot.start ? 'text-white' : 'text-gray-400'
+                      }`}>
+                        {slot.duration} min
+                      </p>
+                    </button>
+                  ))
+                )}
+              </div>
             )}
 
             {selectedSlot && (
               <div className="mt-10 text-center">
                 <button
                   onClick={() => setStep(3)}
-                  className="px-12 py-5 bg-gradient-to-r from-primary to-accent text-white text-xl font-bold rounded-2xl hover:shadow-2xl transition-all flex items-center gap-3 mx-auto"
+                  className="px-12 py-5 bg-gradient-to-r from-primary via-secondary to-accent text-black text-xl font-bold rounded-2xl hover:shadow-2xl hover:bg-primary/20 transition-all flex items-center gap-3 mx-auto"
                 >
                   Continue <Sparkles className="w-6 h-6" />
                 </button>
@@ -274,7 +299,7 @@ const BookInterview = () => {
                   <Clock className="w-7 h-7 text-primary" />
                   <div>
                     <p className="text-base-content/70">Time</p>
-                    <p className="font-bold">{format(new Date(selectedSlot.start), 'h:mm a')}</p>
+                    <p className="font-black text-2xl" style={{ color: '#000000' }}>{format(new Date(selectedSlot.start), 'h:mm a')}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">

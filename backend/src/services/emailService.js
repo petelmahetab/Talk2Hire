@@ -10,7 +10,7 @@ const transporter = nodemailer.createTransport({
 });
 
 export const sendInterviewConfirmationEmail = async (to, interview, recipientType) => {
-  // recipientType = 'candidate' or 'interviewer'
+  
   const isCandidate = recipientType === 'candidate';
   const recipientName = isCandidate ? interview.candidateName : interview.interviewerName;
   const recipientTimezone = isCandidate ? interview.candidateTimezone : interview.interviewerTimezone;

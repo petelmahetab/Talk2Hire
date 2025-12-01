@@ -36,6 +36,7 @@ const interviewScheduleSchema = new mongoose.Schema({
     required: true,
     index: true
   },
+  
   endTime: {
     type: Date,
     required: true

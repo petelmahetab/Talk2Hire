@@ -4,40 +4,54 @@ import Session from "../models/Session.js";
 export async function createSession(req, res) {
   try {
     const { problem, difficulty } = req.body;
-    const userId = req.user._id;
-    const clerkId = req.user.clerkId;
+    const userId = req.user._id;        // MongoDB ObjectId
+    const clerkId = req.user.clerkId;   // Clerk user ID (string)
 
     if (!problem || !difficulty) {
       return res.status(400).json({ message: "Problem and difficulty are required" });
     }
 
-    // generate a unique call id for stream video
+    // Generate unique callId for Stream Video
     const callId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-    // create session in db
-    const session = await Session.create({ problem, difficulty, host: userId, callId });
+    // Create session in DB with proper host reference
+    const session = await Session.create({
+      problem,
+      difficulty,
+      host: userId,           // This now exists in schema → populate works!
+      hostClerkId: clerkId,   // Keep for Stream
+      callId,
+    });
 
-    // create stream video call
+    // Create Stream Video call
     await streamClient.video.call("default", callId).getOrCreate({
       data: {
         created_by_id: clerkId,
-        custom: { problem, difficulty, sessionId: session._id.toString() },
+        custom: {
+          problem,
+          difficulty,
+          sessionId: session._id.toString(),
+        },
       },
     });
 
-    // chat messaging
+    // Create chat channel
     const channel = chatClient.channel("messaging", callId, {
-      name: `${problem} Session`,
+      name: `${problem} - ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} Session`,
       created_by_id: clerkId,
       members: [clerkId],
     });
 
     await channel.create();
 
-    res.status(201).json({ session });
+    res.status(201).json({
+      success: true,
+      session,
+      message: "Session created successfully",
+    });
   } catch (error) {
-    console.log("Error in createSession controller:", error.message);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("Error in createSession controller:", error);
+    res.status(500).json({ success: false, message: "Failed to create session" });
   }
 }
 
