@@ -13,6 +13,7 @@ import sessionRoutes from "./routes/sessionRoute.js";
 import './jobs/reminderJobs.js';
 import schedulingRoutes from './routes/scheduling.js';
 import interviewersRoutes from './routes/interviewers.js';
+import interviewScheduleRoutes from './routes/interviewSchedule.routes.js';
 
 const app = express();
 
@@ -29,7 +30,8 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/sessions", sessionRoutes);
 app.use('/api/scheduling', schedulingRoutes);
 app.use('/api', interviewersRoutes);
-
+// app.use('/api/interviews', interviewScheduleRoutes);
+app.use("/api/interview-schedule", interviewScheduleRoutes);
 
 app.get("/health", (req, res) => {
   res.status(200).json({ msg: "api is up and running" });

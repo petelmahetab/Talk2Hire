@@ -1,7 +1,7 @@
 import express from 'express';
 import InterviewSchedule from '../models/InterviewSchedule.js';
 import InterviewerAvailability from '../models/InterviewerAvailability.js';
-import Session from '../models/Session.js'; 
+import Session from '../models/Session.js';
 import { getAvailableSlots } from '../services/schedulingService.js';
 // import { sendInterviewConfirmationEmail } from '../services/emailService.js';
 import { sendBookingConfirmationEmails } from '../utils/sendEmails.js';
@@ -31,32 +31,31 @@ router.post('/book', async (req, res) => {
   try {
     const data = req.body;
     const roomId = uuidv4();
-    console.log('Created roomId:', roomId); 
-    
+
     const endTime = moment.tz(data.scheduledTime, data.timezone).add(data.duration, 'minutes').toDate();
 
-    // 1. Create InterviewSchedule
     const interview = await InterviewSchedule.create({
       ...data,
       interviewerId: data.interviewerId,
-      candidateId: req.user?.id || null,
+      interviewerName: data.interviewerName || 'Interviewer',
+      interviewerEmail: data.interviewerEmail,
+      candidateName: data.candidateName,
+      candidateEmail: data.candidateEmail,
+      candidatePhone: data.candidatePhone || null,
       roomId,
       endTime,
-      meetingLink: `${process.env.CLIENT_URL}/session/${roomId}`
+      duration: data.duration,
+      interviewType: data.interviewType,
+      timezone: data.timezone,
+      meetingLink: `${process.env.CLIENT_URL}/interview/join/${roomId}`
     });
-    console.log('InterviewSchedule created');
 
-    // 2. CREATE SESSION DOCUMENT
-    const session = await Session.create({
-      callId: roomId,
-      problem: `Mock Interview - ${data.interviewType || 'Technical'}`,
-      difficulty: 'medium',
-      hostClerkId: data.interviewerId,
-      status: 'active'
-    });
-    console.log('Session created with callId:', session.callId);
+    console.log('\n=====================================');
+    console.log('MOCK INTERVIEW BOOKED!');
+    console.log('Room ID:', roomId);
+    console.log('JOIN LINK →', `${process.env.CLIENT_URL}/interview/join/${roomId}`);
+    console.log('=====================================\n');
 
-    // 3. SEND THE NEW GORGEOUS EMAILS
     await sendBookingConfirmationEmails(interview.toObject());
 
     res.json({ success: true, interview });
@@ -136,7 +135,7 @@ router.post('/availability', async (req, res) => {
 //         }
 //       }
 //     ]);
-    
+
 //     res.json({ success: true, interviewers });
 //   } catch (error) {
 //     console.error('Error fetching interviewers:', error);

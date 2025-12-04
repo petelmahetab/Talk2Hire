@@ -1,16 +1,22 @@
+// src/pages/SessionPage.jsx
 import { useUser } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams } from "react-router-dom";
 import { useEndSession, useJoinSession, useSessionById } from "../hooks/useSessions";
 import { PROBLEMS } from "../data/problems";
 import { executeCode } from "../lib/piston";
 import Navbar from "../components/Navbar";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { getDifficultyBadgeClass } from "../lib/utils";
-import { Loader2Icon, LogOutIcon, PhoneOffIcon, BellRing, UserPlus } from "lucide-react";
+import {
+  Loader2Icon,
+  LogOutIcon,
+  PhoneOffIcon,
+  BellRing,
+  UserPlus,
+} from "lucide-react";
 import CodeEditorPanel from "../components/CodeEditorPanel";
 import OutputPanel from "../components/OutputPanel";
-
 import useStreamClient from "../hooks/useStreamClient";
 import { StreamCall, StreamVideo } from "@stream-io/video-react-sdk";
 import VideoCallUI from "../components/VideoCallUI";
@@ -18,17 +24,18 @@ import VideoCallUI from "../components/VideoCallUI";
 function SessionPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
+
   const [output, setOutput] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
 
-  // MOCK INTERVIEW POPUP STATES
+  // MOCK INTERVIEW STATES
   const [isMockInterview, setIsMockInterview] = useState(false);
   const [candidateWaiting, setCandidateWaiting] = useState(false);
   const [candidateName, setCandidateName] = useState("Candidate");
+  const [urlRole, setUrlRole] = useState(null); // 'interviewer' or 'candidate'
 
   const { data: sessionData, isLoading: loadingSession, refetch } = useSessionById(id);
-
   const joinSessionMutation = useJoinSession();
   const endSessionMutation = useEndSession();
 
@@ -36,14 +43,21 @@ function SessionPage() {
   const isHost = session?.host?.clerkId === user?.id;
   const isParticipant = session?.participant?.clerkId === user?.id;
 
+  // FINAL ROLE LOGIC (supports both old practice + new scheduled interviews)
+  const isInterviewer =
+    isHost ||
+    urlRole === "interviewer" ||
+    session?.hostClerkId === user?.id;
+
+  const isCandidate = !isInterviewer && (isParticipant || urlRole === "candidate");
+
   const { call, channel, chatClient, isInitializingCall, streamClient } = useStreamClient(
     session,
     loadingSession,
-    isHost,
-    isParticipant
+    isInterviewer,
+    isCandidate
   );
 
-  // find the problem data based on session problem title
   const problemData = session?.problem
     ? Object.values(PROBLEMS).find((p) => p.title === session.problem)
     : null;
@@ -51,38 +65,47 @@ function SessionPage() {
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
   const [code, setCode] = useState(problemData?.starterCode?.[selectedLanguage] || "");
 
-  // DETECT MOCK INTERVIEW FROM UUID
+  // DETECT IF THIS IS A SCHEDULED MOCK INTERVIEW + ROLE FROM URL
   useEffect(() => {
+    if (!isLoaded) return;
+
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    if (uuidRegex.test(id)) {
+    const isUUID = uuidRegex.test(id);
+
+    if (isUUID) {
       setIsMockInterview(true);
 
-      if (isHost) {
+      const params = new URLSearchParams(window.location.search);
+      const role = params.get("role");
+      setUrlRole(role);
+
+      if (role === "interviewer") {
+        // Show candidate waiting popup after 5 seconds
         const timer = setTimeout(() => {
           setCandidateWaiting(true);
-          setCandidateName("John Doe");
-        }, 8000);
+          setCandidateName("Candidate"); // You can improve this with real name from API later
+        }, 5000);
         return () => clearTimeout(timer);
       }
     }
-  }, [id, isHost]);
+  }, [id, isLoaded]);
 
-  // auto-join session if user is not already a participant and not the host
+  // Auto-join if not already in session
   useEffect(() => {
-    if (!session || !user || loadingSession) return;
-    if (isHost || isParticipant) return;
+    if (!session || !user || loadingSession || !isLoaded) return;
+    if (isInterviewer || isCandidate) return;
 
-    joinSessionMutation.mutate(id, { onSuccess: refetch });
-  }, [session, user, loadingSession, isHost, isParticipant, id]);
+    joinSessionMutation.mutate(id, { onSuccess: () => refetch() });
+  }, [session, user, loadingSession, isInterviewer, isCandidate, id, isLoaded]);
 
-  // redirect the "participant" when session ends
+  // Redirect when session ends
   useEffect(() => {
-    if (!session || loadingSession) return;
+    if (session?.status === "completed") {
+      navigate("/dashboard");
+    }
+  }, [session, navigate]);
 
-    if (session.status === "completed") navigate("/dashboard");
-  }, [session, loadingSession, navigate]);
-
-  // update code when problem loads or changes
+  // Update code when problem or language changes
   useEffect(() => {
     if (problemData?.starterCode?.[selectedLanguage]) {
       setCode(problemData.starterCode[selectedLanguage]);
@@ -92,8 +115,7 @@ function SessionPage() {
   const handleLanguageChange = (e) => {
     const newLang = e.target.value;
     setSelectedLanguage(newLang);
-    const starterCode = problemData?.starterCode?.[newLang] || "";
-    setCode(starterCode);
+    setCode(problemData?.starterCode?.[newLang] || "");
     setOutput(null);
   };
 
@@ -106,193 +128,188 @@ function SessionPage() {
   };
 
   const handleEndSession = () => {
-    if (confirm("Are you sure you want to end this session? All participants will be notified.")) {
+    if (confirm("End this interview?")) {
       endSessionMutation.mutate(id, { onSuccess: () => navigate("/dashboard") });
+    }
+  };
+
+  const handleProblemChange = async (newProblemTitle) => {
+    try {
+      await fetch(`/api/sessions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ problem: newProblemTitle }),
+      });
+      refetch();
+    } catch (err) {
+      alert("Failed to update problem");
     }
   };
 
   const admitCandidate = () => {
     setCandidateWaiting(false);
-    alert("Candidate admitted! Interview started.");
+    // You can add real admission logic here later
   };
 
   return (
     <div className="h-screen bg-base-100 flex flex-col">
       <Navbar />
 
-      {/* MOCK INTERVIEW POPUP — ONLY SHOWS FOR INTERVIEWER */}
-      {isMockInterview && candidateWaiting && isHost && (
+      {/* CANDIDATE WAITING POPUP — ONLY FOR INTERVIEWER */}
+      {isMockInterview && candidateWaiting && isInterviewer && (
         <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-16 text-center animate-bounce">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-16 text-center">
             <div className="w-32 h-32 bg-gradient-to-br from-green-400 to-emerald-600 rounded-full mx-auto mb-8 flex items-center justify-center">
               <BellRing className="w-20 h-20 text-white" />
             </div>
             <h1 className="text-6xl font-black text-gray-900 mb-6">CANDIDATE READY!</h1>
             <p className="text-4xl font-bold text-gray-700 mb-4">{candidateName}</p>
-            <p className="text-2xl text-gray-600 mb-12">is waiting to join the interview</p>
+            <p className="text-2xl text-gray-600 mb-12">is waiting to join</p>
             <div className="flex justify-center gap-10">
-              <button className="px-16 py-8 bg-gray-300 text-gray-700 rounded-3xl font-bold text-2xl hover:bg-gray-400 transition">
+              <button className="px-16 py-8 bg-gray-300 text-gray-700 rounded-3xl font-bold text-2xl hover:bg-gray-400">
                 Deny
               </button>
               <button
                 onClick={admitCandidate}
-                className="px-20 py-8 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-3xl font-bold text-2xl hover:from-green-600 hover:to-emerald-700 transition flex items-center gap-6 shadow-2xl"
+                className="px-20 py-8 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-3xl font-bold text-2xl hover:from-green-600 hover:to-emerald-700 flex items-center gap-6 shadow-2xl"
               >
                 <UserPlus className="w-12 h-12" />
-                ADMIT & START INTERVIEW
+                ADMIT & START
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* YOUR ORIGINAL LAYOUT — 100% UNTOUCHED */}
       <div className="flex-1">
         <PanelGroup direction="horizontal">
-          {/* LEFT PANEL - CODE EDITOR & PROBLEM DETAILS */}
+          {/* LEFT PANEL */}
           <Panel defaultSize={50} minSize={30}>
             <PanelGroup direction="vertical">
-              {/* PROBLEM DSC PANEL */}
+              {/* PROBLEM SECTION */}
               <Panel defaultSize={50} minSize={20}>
                 <div className="h-full overflow-y-auto bg-base-200">
-                  {/* HEADER SECTION */}
                   <div className="p-6 bg-base-100 border-b border-base-300">
-                    <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-start justify-between">
                       <div>
-                        <h1 className="text-3xl font-bold text-base-content">
-                          {session?.problem || "Loading..."}
-                        </h1>
-                        {problemData?.category && (
-                          <p className="text-base-content/60 mt-1">{problemData.category}</p>
+                        {isInterviewer ? (
+                          <select
+                            className="select select-primary w-full max-w-lg text-2xl font-bold bg-white"
+                            value={session?.problem || ""}
+                            onChange={(e) => handleProblemChange(e.target.value)}
+                          >
+                            <option value="">Select Problem to Start...</option>
+                            {Object.values(PROBLEMS).map((p) => (
+                              <option key={p.title} value={p.title}>
+                                {p.title}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <h1 className="text-3xl font-bold text-base-content">
+                            {session?.problem || "Waiting for interviewer to select problem..."}
+                          </h1>
                         )}
-                        <p className="text-base-content/60 mt-2">
-                          Host: {session?.host?.name || "Loading..."} •{" "}
-                          {session?.participant ? 2 : 1}/2 participants
+
+                        {problemData?.category && (
+                          <p className="text-base-content/60 mt-2">{problemData.category}</p>
+                        )}
+                        <p className="text-base-content/60 mt-3">
+                          {isInterviewer ? "You are the Interviewer" : "You are the Candidate"} •{" "}
+                          {session?.participant ? "2" : "1"}/2 online
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`badge badge-lg ${getDifficultyBadgeClass(
-                            session?.difficulty
-                          )}`}
-                        >
-                          {session?.difficulty.slice(0, 1).toUpperCase() +
-                            session?.difficulty.slice(1) || "Easy"}
+                      <div className="flex items-center gap-4">
+                        <span className={`badge badge-lg ${getDifficultyBadgeClass(session?.difficulty)}`}>
+                          {session?.difficulty?.charAt(0).toUpperCase() + session?.difficulty?.slice(1) || "Medium"}
                         </span>
-                        {isHost && session?.status === "active" && (
-                          <button
-                            onClick={handleEndSession}
-                            disabled={endSessionMutation.isPending}
-                            className="btn btn-error btn-sm gap-2"
-                          >
+
+                        {isInterviewer && session?.status === "active" && (
+                          <button onClick={handleEndSession} className="btn btn-error btn-sm gap-2">
                             {endSessionMutation.isPending ? (
                               <Loader2Icon className="w-4 h-4 animate-spin" />
                             ) : (
-                              <LogOutIcon className="w-4 h-4" />
+                              <PhoneOffIcon className="w-4 h-4" />
                             )}
-                            End Session
+                            End Interview
                           </button>
-                        )}
-                        {session?.status === "completed" && (
-                          <span className="badge badge-ghost badge-lg">Completed</span>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* YOUR ORIGINAL PROBLEM CONTENT — UNTOUCHED */}
-                  <div className="p-6 space-y-6">
-                    {/* problem desc */}
-                    {problemData?.description && (
-                      <div className="bg-base-100 rounded-xl shadow-sm p-5 border border-base-300">
-                        <h2 className="text-xl font-bold mb-4 text-base-content">Description</h2>
-                        <div className="space-y-3 text-base leading-relaxed">
-                          <p className="text-base-content/90">{problemData.description.text}</p>
-                          {problemData.description.notes?.map((note, idx) => (
-                            <p key={idx} className="text-base-content/90">
-                              {note}
-                            </p>
+                  {/* PROBLEM CONTENT (only shows when problem selected) */}
+                  {problemData && (
+                    <div className="p-6 space-y-6">
+                      {/* Description */}
+                      <div className="bg-base-100 rounded-xl shadow-sm p-5 border">
+                        <h2 className="text-xl font-bold mb-4">Description</h2>
+                        <div className="prose prose-sm max-w-none text-base-content/90">
+                          <p>{problemData.description.text}</p>
+                          {problemData.description.notes?.map((n, i) => (
+                            <p key={i} className="mt-2">{n}</p>
                           ))}
                         </div>
                       </div>
-                    )}
 
-                    {/* examples section */}
-                    {problemData?.examples && problemData.examples.length > 0 && (
-                      <div className="bg-base-100 rounded-xl shadow-sm p-5 border border-base-300">
-                        <h2 className="text-xl font-bold mb-4 text-base-content">Examples</h2>
-                        <div className="space-y-4">
-                          {problemData.examples.map((example, idx) => (
-                            <div key={idx}>
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="badge badge-sm">{idx + 1}</span>
-                                <p className="font-semibold text-base-content">Example {idx + 1}</p>
-                              </div>
-                              <div className="bg-base-200 rounded-lg p-4 font-mono text-sm space-y-1.5">
-                                <div className="flex gap-2">
-                                  <span className="text-primary font-bold min-w-[70px]">
-                                    Input:
-                                  </span>
-                                  <span>{example.input}</span>
-                                </div>
-                                <div className="flex gap-2">
-                                  <span className="text-secondary font-bold min-w-[70px]">
-                                    Output:
-                                  </span>
-                                  <span>{example.output}</span>
-                                </div>
-                                {example.explanation && (
-                                  <div className="pt-2 border-t border-base-300 mt-2">
-                                    <span className="text-base-content/60 font-sans text-xs">
-                                      <span className="font-semibold">Explanation:</span>{" "}
-                                      {example.explanation}
-                                    </span>
-                                  </div>
+                      {/* Examples */}
+                      {problemData.examples?.length > 0 && (
+                        <div className="bg-base-100 rounded-xl shadow-sm p-5 border">
+                          <h2 className="text-xl font-bold mb-4">Examples</h2>
+                          {problemData.examples.map((ex, i) => (
+                            <div key={i} className="mb-4 p-4 bg-base-200 rounded-lg">
+                              <p className="font-bold mb-2">Example {i + 1}:</p>
+                              <pre className="text-sm bg-base-300 p-3 rounded">
+                                <strong>Input:</strong> {ex.input}
+                                <br />
+                                <strong>Output:</strong> {ex.output}
+                                {ex.explanation && (
+                                  <>
+                                    <br />
+                                    <strong>Explanation:</strong>: {ex.explanation}
+                                  </>
                                 )}
-                              </div>
+                              </pre>
                             </div>
                           ))}
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Constraints */}
-                    {problemData?.constraints && problemData.constraints.length > 0 && (
-                      <div className="bg-base-100 rounded-xl shadow-sm p-5 border border-base-300">
-                        <h2 className="text-xl font-bold mb-4 text-base-content">Constraints</h2>
-                        <ul className="space-y-2 text-base-content/90">
-                          {problemData.constraints.map((constraint, idx) => (
-                            <li key={idx} className="flex gap-2">
-                              <span className="text-primary">•</span>
-                              <code className="text-sm">{constraint}</code>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
+                      {/* Constraints */}
+                      {problemData.constraints && (
+                        <div className="bg-base-100 rounded-xl shadow-sm p-5 border">
+                          <h2 className="text-xl font-bold mb-4">Constraints</h2>
+                          <ul className="space-y-1">
+                            {problemData.constraints.map((c, i) => (
+                              <li key={i} className="text-sm">• {c}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </Panel>
 
-              <PanelResizeHandle className="h-2 bg-base-300 hover:bg-primary transition-colors cursor-row-resize" />
+              <PanelResizeHandle className="h-2 bg-base-300 hover:bg-primary transition-colors" />
 
-              <Panel defaultSize={50} minSize={20}>
+              {/* CODE EDITOR + OUTPUT */}
+              <Panel defaultSize={50}>
                 <PanelGroup direction="vertical">
-                  <Panel defaultSize={70} minSize={30}>
+                  <Panel defaultSize={70}>
                     <CodeEditorPanel
                       selectedLanguage={selectedLanguage}
                       code={code}
                       isRunning={isRunning}
                       onLanguageChange={handleLanguageChange}
-                      onCodeChange={(value) => setCode(value)}
+                      onCodeChange={setCode}
                       onRunCode={handleRunCode}
                     />
                   </Panel>
-
-                  <PanelResizeHandle className="h-2 bg-base-300 hover:bg-primary transition-colors cursor-row-resize" />
-
-                  <Panel defaultSize={30} minSize={15}>
+                  <PanelResizeHandle className="h-2 bg-base-300 hover:bg-primary" />
+                  <Panel defaultSize={30}>
                     <OutputPanel output={output} />
                   </Panel>
                 </PanelGroup>
@@ -300,38 +317,28 @@ function SessionPage() {
             </PanelGroup>
           </Panel>
 
-          <PanelResizeHandle className="w-2 bg-base-300 hover:bg-primary transition-colors cursor-col-resize" />
+          <PanelResizeHandle className="w-2 bg-base-300 hover:bg-primary" />
 
-          {/* RIGHT PANEL - VIDEO CALLS & CHAT */}
+          {/* RIGHT PANEL - VIDEO CALL */}
           <Panel defaultSize={50} minSize={30}>
-            <div className="h-full bg-base-200 p-4 overflow-auto">
+            <div className="h-full bg-base-200 p-4">
               {isInitializingCall ? (
-                <div className="h-full flex items-center justify-center">
+                <div className="flex h-full items-center justify-center">
                   <div className="text-center">
-                    <Loader2Icon className="w-12 h-12 mx-auto animate-spin text-primary mb-4" />
-                    <p className="text-lg">Connecting to video call...</p>
+                    <Loader2Icon className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+                    <p>Connecting to video call...</p>
                   </div>
                 </div>
-              ) : !streamClient || !call ? (
-                <div className="h-full flex items-center justify-center">
-                  <div className="card bg-base-100 shadow-xl max-w-md">
-                    <div className="card-body items-center text-center">
-                      <div className="w-24 h-24 bg-error/10 rounded-full flex items-center justify-center mb-4">
-                        <PhoneOffIcon className="w-12 h-12 text-error" />
-                      </div>
-                      <h2 className="card-title text-2xl">Connection Failed</h2>
-                      <p className="text-base-content/70">Unable to connect to the video call</p>
-                    </div>
-                  </div>
+              ) : !call ? (
+                <div className="flex h-full items-center justify-center text-error">
+                  <p>Failed to connect to video call</p>
                 </div>
               ) : (
-                <div className="h-full">
-                  <StreamVideo client={streamClient}>
-                    <StreamCall call={call}>
-                      <VideoCallUI chatClient={chatClient} channel={channel} />
-                    </StreamCall>
-                  </StreamVideo>
-                </div>
+                <StreamVideo client={streamClient}>
+                  <StreamCall call={call}>
+                    <VideoCallUI chatClient={chatClient} channel={channel} />
+                  </StreamCall>
+                </StreamVideo>
               )}
             </div>
           </Panel>
