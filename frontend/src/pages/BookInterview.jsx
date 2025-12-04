@@ -35,15 +35,14 @@ const BookInterview = () => {
   const handlePhoneChange = (e) => {
     let value = e.target.value;
     
-    // Ensure it always starts with +91
+    
     if (!value.startsWith('+91')) {
       value = '+91 ' + value.replace(/^\+91\s*/, '');
     }
     
-    // Remove non-numeric characters after +91
     const numbers = value.slice(4).replace(/\D/g, '');
     
-    // Limit to 10 digits
+    
     if (numbers.length <= 10) {
       setFormData({ ...formData, candidatePhone: '+91 ' + numbers });
     }
