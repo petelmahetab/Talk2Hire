@@ -1,6 +1,6 @@
 // src/pages/MockInterviewSession.jsx
 import { useUser } from "@clerk/clerk-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { PROBLEMS } from "../data/problems";
 import { executeCode } from "../lib/piston";
@@ -21,6 +21,8 @@ import useStreamClient from "../hooks/useStreamClient";
 import { StreamCall, StreamVideo } from "@stream-io/video-react-sdk";
 import VideoCallUI from "../components/VideoCallUI";
 import axios from "axios";
+import toast from "react-hot-toast";
+import confetti from "canvas-confetti";
 
 function MockInterviewSession() {
     const navigate = useNavigate();
@@ -33,96 +35,42 @@ function MockInterviewSession() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Interview data
     const [interview, setInterview] = useState(null);
     const [session, setSession] = useState(null);
     const [selectedProblem, setSelectedProblem] = useState(null);
 
-    // Role from URL
-    const urlRole = searchParams.get("role"); // 'interviewer' or 'candidate'
+    const urlRole = searchParams.get("role");
     const isInterviewer = urlRole === "interviewer";
     const isCandidate = urlRole === "candidate";
 
-    // Candidate admission state (for interviewer)
     const [candidateWaiting, setCandidateWaiting] = useState(false);
     const [candidateAdmitted, setCandidateAdmitted] = useState(false);
 
-    // Code editor state
     const [selectedLanguage, setSelectedLanguage] = useState("javascript");
     const [code, setCode] = useState("");
 
-    // Stream setup
+    // Timer state – shared start time
+    const [timeLeft, setTimeLeft] = useState(null);           // seconds remaining
+    const [interviewStartedAt, setInterviewStartedAt] = useState(null); // timestamp when candidate was admitted
+    const timerIntervalRef = useRef(null);
+
     const { call, channel, chatClient, isInitializingCall, streamClient } = useStreamClient(
-        session,
-        loading,
-        isInterviewer,
-        isCandidate
+        session, loading, isInterviewer, isCandidate
     );
 
-    // Get problem data
     const problemData = selectedProblem
         ? Object.values(PROBLEMS).find((p) => p.title === selectedProblem)
         : null;
 
-    // Fetch interview and session data
-    //   useEffect(() => {
-    //     if (!isLoaded || !user) return;
-
-    //     const fetchInterviewData = async () => {
-    //       try {
-    //         setLoading(true);
-    //         console.log("🔍 Fetching interview data for room:", roomId);
-
-    //         // Get interview details
-    //         const interviewRes = await axios.get(
-    //           `/api/interview-schedule/room/${roomId}`,
-    //           { withCredentials: true }
-    //         );
-
-    //         if (interviewRes.data.success) {
-    //           setInterview(interviewRes.data.interview);
-
-    //           // Set initial problem if available
-    //           if (interviewRes.data.interview.interviewType) {
-    //             // Map interview type to a default problem
-    //             const typeToProblems = {
-    //               dsa: "Two Sum",
-    //               "system-design": "Design URL Shortener",
-    //               frontend: "Build Todo App",
-    //               backend: "Design REST API",
-    //               fullstack: "Two Sum",
-    //               behavioral: "Tell Me About Yourself"
-    //             };
-    //             const defaultProblem = typeToProblems[interviewRes.data.interview.interviewType] || "Two Sum";
-    //             setSelectedProblem(defaultProblem);
-    //           }
-    //         }
-
-    //         // For interviewer: Show candidate waiting popup after 5 seconds
-    //         if (isInterviewer) {
-    //           setTimeout(() => {
-    //             setCandidateWaiting(true);
-    //           }, 5000);
-    //         }
-
-    //         setLoading(false);
-    //       } catch (err) {
-    //         console.error("❌ Failed to fetch interview:", err);
-    //         setError(err.response?.data?.message || "Failed to load interview");
-    //         setLoading(false);
-    //       }
-    //     };
-
-    //     fetchInterviewData();
-    //   }, [roomId, isLoaded, user, isInterviewer]);
-
+    // ──────────────────────────────────────────────────────────────
+    // Join room (only fetch data + show waiting popup for interviewer)
+    // ──────────────────────────────────────────────────────────────
     useEffect(() => {
         if (!isLoaded || !user) return;
 
         const joinRoom = async () => {
             try {
                 setLoading(true);
-
                 const res = await axios.post(
                     `/api/interview-schedule/room/${roomId}/join`,
                     {},
@@ -131,7 +79,7 @@ function MockInterviewSession() {
 
                 if (res.data.success) {
                     setInterview(res.data.interview);
-                    setSession(res.data.session); // ← THIS IS THE MAGIC LINE
+                    setSession(res.data.session);
 
                     const typeToProblems = {
                         dsa: "Two Sum",
@@ -159,7 +107,130 @@ function MockInterviewSession() {
         joinRoom();
     }, [roomId, isLoaded, user, isInterviewer]);
 
-    // Update code when problem or language changes
+    // ──────────────────────────────────────────────────────────────
+    // When interviewer admits candidate → start timer for BOTH sides
+    // ──────────────────────────────────────────────────────────────
+    const admitCandidate = () => {
+        setCandidateWaiting(false);
+        setCandidateAdmitted(true);
+
+        const durationSeconds = (interview?.duration || 45) * 60;
+        const startTimestamp = Date.now();                 // exact moment candidate is admitted
+        setInterviewStartedAt(startTimestamp);
+        setTimeLeft(durationSeconds);
+    };
+
+    // ──────────────────────────────────────────────────────────────
+    // Timer countdown (runs on both interviewer & candidate)
+    // ──────────────────────────────────────────────────────────────
+    useEffect(() => {
+        if (!interviewStartedAt || timeLeft === null) return;
+
+        timerIntervalRef.current = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - interviewStartedAt) / 1000);
+            const remaining = Math.max(0, (interview?.duration || 45) * 60 - elapsed);
+
+            setTimeLeft(remaining);
+
+            if (remaining <= 0) {
+                clearInterval(timerIntervalRef.current);
+                handleTimeUp();
+            }
+        }, 500);
+
+        return () => clearInterval(timerIntervalRef.current);
+    }, [interviewStartedAt, interview?.duration]);
+
+    const handleTimeUp = async () => {
+        toast.error("Time's up! Interview ended automatically.", {
+            duration: 8000,
+            icon: "Time Over",
+        });
+
+        try {
+            await axios.post(`/api/interview-schedule/room/${roomId}/complete`, {}, { withCredentials: true });
+        } catch (err) {
+            console.error("Auto-end failed:", err);
+        }
+        setTimeout(() => navigate("/dashboard"), 3000);
+    };
+
+    const formatTime = (seconds) => {
+        const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
+        const secs = String(seconds % 60).padStart(2, "0");
+        return `${mins}:${secs}`;
+    };
+
+    // ──────────────────────────────────────────────────────────────
+    // Code execution + test-case toast (only for candidate)
+    // ──────────────────────────────────────────────────────────────
+    const handleRunCode = async () => {
+        setIsRunning(true);
+        setOutput(null);
+        const result = await executeCode(selectedLanguage, code);
+        setOutput(result);
+        setIsRunning(false);
+
+        if (problemData?.testCases && problemData.testCases.length > 0 && isCandidate) {
+            let passed = 0;
+            const total = problemData.testCases.length;
+
+            problemData.testCases.forEach(tc => {
+                if ((result?.output || "").trim() === tc.expectedOutput.trim()) passed++;
+            });
+
+            if (passed === total) {
+                confetti({ particleCount: 180, spread: 70, origin: { y: 0.6 } });
+                toast.success(`Congratulations! All ${total} test cases passed!`, {
+                    duration: 8000,
+                    style: { background: "linear-gradient(135deg, #10b981, #059669)", color: "white", fontWeight: "bold" },
+                });
+            } else {
+                const failed = total - passed;
+                toast.error(`${failed} test case${failed > 1 ? "s" : ""} failed. Keep trying!`, { duration: 7000 });
+            }
+        }
+    };
+
+    // ──────────────────────────────────────────────────────────────
+    // End interview toast (unchanged – only interviewer sees the button)
+    // ──────────────────────────────────────────────────────────────
+    const handleEndInterview = () => {
+        toast(
+            (t) => (
+                <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-2xl max-w-sm">
+                    <h3 className="text-xl font-bold mb-4">End Interview?</h3>
+                    <p className="text-sm opacity-90 mb-6">This will close the session for both participants.</p>
+                    <div className="flex gap-3 justify-end">
+                        <button onClick={() => toast.dismiss(t.id)} className="px-5 py-2 bg-gray-700 rounded-lg hover:bg-gray-600 transition">
+                            Cancel
+                        </button>
+                        <button
+                            onClick={async () => {
+                                toast.dismiss(t.id);
+                                toast.loading("Ending interview...");
+                                try {
+                                    await axios.post(`/api/interview-schedule/room/${roomId}/complete`, {}, { withCredentials: true });
+                                    toast.success("Interview ended successfully!");
+                                    setTimeout(() => navigate("/dashboard"), 1500);
+                                } catch {
+                                    toast.error("Failed to end interview");
+                                }
+                            }}
+                            className="px-6 py-2 bg-red-600 rounded-lg hover:bg-red-700 font-medium transition"
+                        >
+                            End Now
+                        </button>
+                    </div>
+                </div>
+            ),
+            { duration: Infinity }
+        );
+    };
+
+    // ──────────────────────────────────────────────────────────────
+    // Rest of your original UI (unchanged)
+    // ──────────────────────────────────────────────────────────────
     useEffect(() => {
         if (problemData?.starterCode?.[selectedLanguage]) {
             setCode(problemData.starterCode[selectedLanguage]);
@@ -168,7 +239,6 @@ function MockInterviewSession() {
         }
     }, [problemData, selectedLanguage]);
 
-    // Handle language change
     const handleLanguageChange = (e) => {
         const newLang = e.target.value;
         setSelectedLanguage(newLang);
@@ -176,45 +246,6 @@ function MockInterviewSession() {
         setOutput(null);
     };
 
-    // Run code
-    const handleRunCode = async () => {
-        setIsRunning(true);
-        setOutput(null);
-        const result = await executeCode(selectedLanguage, code);
-        setOutput(result);
-        setIsRunning(false);
-    };
-
-    // Change problem (interviewer only)
-    const handleProblemChange = (newProblemTitle) => {
-        setSelectedProblem(newProblemTitle);
-        setOutput(null);
-    };
-
-    // End interview (interviewer only)
-    const handleEndInterview = async () => {
-        if (!confirm("End this mock interview?")) return;
-
-        try {
-            await axios.post(
-                `/api/interview-schedule/room/${roomId}/complete`,
-                {},
-                { withCredentials: true }
-            );
-            navigate("/dashboard");
-        } catch (err) {
-            console.error("❌ Failed to end interview:", err);
-            alert("Failed to end interview");
-        }
-    };
-
-    // Admit candidate
-    const admitCandidate = () => {
-        setCandidateWaiting(false);
-        setCandidateAdmitted(true);
-    };
-
-    // Loading state
     if (loading || !isLoaded) {
         return (
             <div className="h-screen flex items-center justify-center bg-base-100">
@@ -226,7 +257,6 @@ function MockInterviewSession() {
         );
     }
 
-    // Error state
     if (error) {
         return (
             <div className="h-screen flex items-center justify-center bg-base-100">
@@ -234,10 +264,7 @@ function MockInterviewSession() {
                     <AlertCircle className="w-16 h-16 text-error mx-auto mb-4" />
                     <h2 className="text-2xl font-bold mb-2">Unable to Join</h2>
                     <p className="text-base-content/70 mb-6">{error}</p>
-                    <button
-                        onClick={() => navigate("/dashboard")}
-                        className="btn btn-primary"
-                    >
+                    <button onClick={() => navigate("/dashboard")} className="btn btn-primary">
                         Go to Dashboard
                     </button>
                 </div>
@@ -249,7 +276,17 @@ function MockInterviewSession() {
         <div className="h-screen bg-base-100 flex flex-col">
             <Navbar />
 
-            {/* CANDIDATE WAITING POPUP — ONLY FOR INTERVIEWER */}
+            {/* LIVE TIMER – visible to both */}
+            {timeLeft !== null && (
+                <div className="absolute top-20 right-6 z-50 bg-black/90 backdrop-blur-md text-white px-6 py-4 rounded-2xl shadow-2xl border border-red-500/30">
+                    <div className={`flex items-center gap-3 text-2xl font-bold ${timeLeft < 300 ? "text-red-400 animate-pulse" : ""}`}>
+                        <Clock className="w-8 h-8" />
+                        {formatTime(timeLeft)}
+                    </div>
+                </div>
+            )}
+
+            {/* Candidate waiting popup */}
             {candidateWaiting && isInterviewer && !candidateAdmitted && (
                 <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-16 text-center">
@@ -262,10 +299,7 @@ function MockInterviewSession() {
                         </p>
                         <p className="text-2xl text-gray-600 mb-12">is waiting to join</p>
                         <div className="flex justify-center gap-10">
-                            <button
-                                onClick={() => setCandidateWaiting(false)}
-                                className="px-16 py-8 bg-gray-300 text-gray-700 rounded-3xl font-bold text-2xl hover:bg-gray-400 transition"
-                            >
+                            <button onClick={() => setCandidateWaiting(false)} className="px-16 py-8 bg-gray-300 text-gray-700 rounded-3xl font-bold text-2xl hover:bg-gray-400 transition">
                                 Deny
                             </button>
                             <button
@@ -280,24 +314,23 @@ function MockInterviewSession() {
                 </div>
             )}
 
+            {/* ────── YOUR ORIGINAL LAYOUT (unchanged) ────── */}
             <div className="flex-1 overflow-hidden">
                 <PanelGroup direction="horizontal">
                     {/* LEFT PANEL */}
                     <Panel defaultSize={50} minSize={30}>
                         <PanelGroup direction="vertical">
-                            {/* PROBLEM SECTION */}
                             <Panel defaultSize={50} minSize={20}>
                                 <div className="h-full overflow-y-auto bg-base-200">
                                     <div className="p-6 bg-base-100 border-b border-base-300">
                                         <div className="flex items-start justify-between">
                                             <div className="flex-1">
-                                                {/* Interviewer: Can select problem */}
                                                 {isInterviewer ? (
                                                     <div>
                                                         <select
                                                             className="select text-gray-400 w-full max-w-lg text-2xl font-bold bg-black"
                                                             value={selectedProblem || ""}
-                                                            onChange={(e) => handleProblemChange(e.target.value)}
+                                                            onChange={(e) => setSelectedProblem(e.target.value)}
                                                         >
                                                             <option value="">Select Problem to Start...</option>
                                                             {Object.values(PROBLEMS).map((p) => (
@@ -312,10 +345,8 @@ function MockInterviewSession() {
                                                                 {interview?.interviewType?.toUpperCase()}
                                                             </span>
                                                         </p>
-
                                                     </div>
                                                 ) : (
-                                                    /* Candidate: See selected problem */
                                                     <div>
                                                         <h1 className="text-3xl font-bold text-base-content">
                                                             {selectedProblem || "Waiting for interviewer to select problem..."}
@@ -325,40 +356,29 @@ function MockInterviewSession() {
                                                         )}
                                                     </div>
                                                 )}
-
                                                 <div className="flex items-center gap-4 mt-3 text-sm">
                                                     <span className="flex items-center gap-2">
                                                         <div className={`w-2 h-2 rounded-full ${isInterviewer ? 'bg-blue-500' : 'bg-green-500'}`} />
                                                         You are the {isInterviewer ? "Interviewer" : "Candidate"}
                                                     </span>
-                                                    <span className="text-base-content/60">
-                                                        Mock Interview Session
-                                                    </span>
+                                                    <span className="text-base-content/60">Mock Interview Session</span>
                                                 </div>
                                             </div>
 
-                                            {/* Right side controls */}
                                             <div className="flex items-center gap-4">
                                                 {problemData && (
                                                     <span className={`badge badge-lg ${getDifficultyBadgeClass(problemData.difficulty)}`}>
                                                         {problemData.difficulty?.charAt(0).toUpperCase() + problemData.difficulty?.slice(1)}
                                                     </span>
                                                 )}
-
-                                                {/* Show interview time */}
-                                                {interview && (
-                                                    <div className="flex items-center gap-2 text-sm text-base-content/70">
-                                                        <Clock className="w-4 h-4" />
-                                                        {interview.duration} min
+                                                {timeLeft !== null && (
+                                                    <div className="flex items-center gap-2 text-lg font-bold text-primary">
+                                                        <Clock className="w-5 h-5" />
+                                                        {formatTime(timeLeft)}
                                                     </div>
                                                 )}
-
-                                                {/* End interview button (interviewer only) */}
                                                 {isInterviewer && (
-                                                    <button
-                                                        onClick={handleEndInterview}
-                                                        className="btn btn-error btn-sm gap-2"
-                                                    >
+                                                    <button onClick={handleEndInterview} className="btn btn-error btn-sm gap-2">
                                                         <PhoneOffIcon className="w-4 h-4" />
                                                         End Interview
                                                     </button>
@@ -367,10 +387,9 @@ function MockInterviewSession() {
                                         </div>
                                     </div>
 
-                                    {/* PROBLEM CONTENT */}
+                                    {/* Problem description, examples, constraints – unchanged */}
                                     {problemData ? (
                                         <div className="p-6 space-y-6">
-                                            {/* Description */}
                                             <div className="bg-base-100 rounded-xl shadow-sm p-5 border border-base-300">
                                                 <h2 className="text-xl font-bold mb-4">Description</h2>
                                                 <div className="prose prose-sm max-w-none text-base-content/90">
@@ -381,7 +400,6 @@ function MockInterviewSession() {
                                                 </div>
                                             </div>
 
-                                            {/* Examples */}
                                             {problemData.examples?.length > 0 && (
                                                 <div className="bg-base-100 rounded-xl shadow-sm p-5 border border-base-300">
                                                     <h2 className="text-xl font-bold mb-4">Examples</h2>
@@ -404,7 +422,6 @@ function MockInterviewSession() {
                                                 </div>
                                             )}
 
-                                            {/* Constraints */}
                                             {problemData.constraints && (
                                                 <div className="bg-base-100 rounded-xl shadow-sm p-5 border border-base-300">
                                                     <h2 className="text-xl font-bold mb-4">Constraints</h2>
@@ -433,7 +450,6 @@ function MockInterviewSession() {
 
                             <PanelResizeHandle className="h-2 bg-base-300 hover:bg-primary transition-colors" />
 
-                            {/* CODE EDITOR + OUTPUT */}
                             <Panel defaultSize={50}>
                                 <PanelGroup direction="vertical">
                                     <Panel defaultSize={70}>
@@ -457,7 +473,6 @@ function MockInterviewSession() {
 
                     <PanelResizeHandle className="w-2 bg-base-300 hover:bg-primary" />
 
-                    {/* RIGHT PANEL - VIDEO CALL */}
                     <Panel defaultSize={50} minSize={30}>
                         <div className="h-full bg-base-200 p-4">
                             {isInitializingCall ? (

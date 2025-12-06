@@ -115,7 +115,7 @@ function SessionPage() {
   // Interviewer not need to Choose any problem automatically it will selected.
   useEffect(() => {
     if (isInterviewer && !session?.problem && Object.values(PROBLEMS).length > 0) {
-      const defaultProblem = "Two Sum"; // or any you prefer
+      const defaultProblem = "Two Sum"; 
       handleProblemChange(defaultProblem);
     }
   }, [isInterviewer, session?.problem]);
@@ -203,7 +203,7 @@ function SessionPage() {
                       <div>
                         {isInterviewer ? (
                           <select
-                            className="select select-primary w-full max-w-lg text-2xl font-bold bg-white"
+                            className="select text-gray-500 w-full max-w-lg text-1xl font-bold bg-black"
                             value={session?.problem || ""}
                             onChange={(e) => handleProblemChange(e.target.value)}
                           >
@@ -241,7 +241,7 @@ function SessionPage() {
                             ) : (
                               <PhoneOffIcon className="w-4 h-4" />
                             )}
-                            End Interview
+                            End Session
                           </button>
                         )}
                       </div>
