@@ -1,5 +1,4 @@
-// src/pages/InterviewJoin.jsx
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Loader2, Clock, AlertCircle } from 'lucide-react';
@@ -8,8 +7,7 @@ import toast from 'react-hot-toast';
 const InterviewJoin = () => {
   const { roomId } = useParams();
   const navigate = useNavigate();
-
-  useNavigate();
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -18,24 +16,35 @@ const InterviewJoin = () => {
       if (cancelled) return;
 
       try {
-        const res = await axios.post(`/api/interview-schedule/room/${roomId}/join`, {}, {
-          withCredentials: true,
-        });
+        console.log('🔄 Joining interview room:', roomId);
+
+        const res = await axios.post(
+          `/api/interview-schedule/room/${roomId}/join`,
+          {},
+          { withCredentials: true }
+        );
+
+        console.log('✅ Join response:', res.data);
 
         if (res.data.success && !cancelled) {
           const role = res.data.role;
+          
           toast.success(
             role === 'interviewer'
-              ? 'Welcome, Interviewer! Select a problem to begin.'
-              : 'Welcome, Candidate! Waiting for interviewer...',
-            { duration: 4000 }
+              ? '🎯 Welcome, Interviewer! Select a problem to begin.'
+              : '👋 Welcome, Candidate! Waiting for interviewer...',
+            { duration: 3000 }
           );
-          navigate(`/session/${roomId}?type=scheduled&role=${role}`);
+
+          // FIXED: Redirect to mock-interview page, not session page
+          navigate(`/mock-interview/${roomId}?role=${role}`);
         }
       } catch (err) {
         if (cancelled) return;
 
+        console.error('❌ Join error:', err);
         const msg = err.response?.data?.message || 'Invalid or expired link';
+        setError(msg);
 
         if (msg.includes('15 minutes')) {
           toast.error(
@@ -46,12 +55,16 @@ const InterviewJoin = () => {
               </div>
               <p className="text-sm mt-1">Opens 15 minutes before start time</p>
             </div>,
-            { duration: 4000, id: 'room-not-open' }
+            { duration: 5000, id: 'room-not-open' }
           );
         } else {
-          toast.error(msg, { id: 'join-error' });
+          toast.error(msg, { id: 'join-error', duration: 4000 });
         }
-        navigate('/');
+
+        // Redirect to dashboard after error
+        setTimeout(() => {
+          if (!cancelled) navigate('/dashboard');
+        }, 3000);
       }
     };
 
@@ -63,31 +76,51 @@ const InterviewJoin = () => {
   }, [roomId, navigate]);
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-black">
-      {/* Animated background glow */}
+    <div className="flex items-center justify-center min-h-screen bg-black relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-black to-cyan-900/20" />
+      
+      <div className="absolute top-20 left-20 w-72 h-72 bg-purple-500/30 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute bottom-20 right-20 w-96 h-96 bg-cyan-500/20 rounded-full blur-3xl animate-pulse" 
+        style={{ animationDelay: '700ms' }} />
 
-      <div className="relative z-10 text-center p-12 bg-black/60 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl">
-        {/* Spinning Loader with glow */}
-        <div className="mb-8">
-          <Loader2 className="w-20 h-20 animate-spin mx-auto text-transparent bg-clip-text bg-gradient-to-r from-primary via-secondary to-accent drop-shadow-2xl" />
-        </div>
-
-        {/* Gradient animated loading text */}
-        <h2 className="font-black text-4xl bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent font-mono tracking-wider animate-pulse">
-          JOINING INTERVIEW ROOM
-        </h2>
-
-        <p className="text-gray-400 mt-4 text-lg tracking-wide">
-          Please wait while we connect you...
-        </p>
-
-        {/* Subtle pulsing dots */}
-        <div className="flex justify-center gap-2 mt-8">
-          <div className="w-3 h-3 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-          <div className="w-3 h-3 bg-secondary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-          <div className="w-3 h-3 bg-accent rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-        </div>
+      <div className="relative z-10 text-center p-12 bg-black/60 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl max-w-md">
+        {error ? (
+          <>
+            <div className="mb-8">
+              <AlertCircle className="w-20 h-20 mx-auto text-red-500 animate-pulse" />
+            </div>
+            <h2 className="font-black text-4xl text-red-500 font-mono tracking-wider mb-4">
+              ACCESS DENIED
+            </h2>
+            <p className="text-gray-300 text-lg mb-2">{error}</p>
+            <p className="text-gray-500 text-sm">Redirecting to dashboard...</p>
+          </>
+        ) : (
+          <>
+            <div className="mb-8">
+              <Loader2 
+                className="w-20 h-20 animate-spin mx-auto text-purple-500" 
+                style={{ filter: 'drop-shadow(0 0 20px rgba(168, 85, 247, 0.8))' }} 
+              />
+            </div>
+            
+            <h2 className="font-black text-4xl bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent font-mono tracking-wider animate-pulse mb-4">
+              JOINING INTERVIEW
+            </h2>
+            
+            <p className="text-gray-400 text-lg tracking-wide mb-8">
+              Please wait while we connect you...
+            </p>
+            
+            <div className="flex justify-center gap-3">
+              <div className="w-3 h-3 bg-purple-500 rounded-full animate-bounce" />
+              <div className="w-3 h-3 bg-pink-500 rounded-full animate-bounce" 
+                style={{ animationDelay: '150ms' }} />
+              <div className="w-3 h-3 bg-cyan-500 rounded-full animate-bounce" 
+                style={{ animationDelay: '300ms' }} />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -112,6 +112,14 @@ function SessionPage() {
     }
   }, [problemData, selectedLanguage]);
 
+  // Interviewer not need to Choose any problem automatically it will selected.
+  useEffect(() => {
+    if (isInterviewer && !session?.problem && Object.values(PROBLEMS).length > 0) {
+      const defaultProblem = "Two Sum"; // or any you prefer
+      handleProblemChange(defaultProblem);
+    }
+  }, [isInterviewer, session?.problem]);
+
   const handleLanguageChange = (e) => {
     const newLang = e.target.value;
     setSelectedLanguage(newLang);
