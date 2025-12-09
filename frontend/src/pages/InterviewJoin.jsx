@@ -16,7 +16,7 @@ const InterviewJoin = () => {
       if (cancelled) return;
 
       try {
-        console.log('🔄 Joining interview room:', roomId);
+        // console.log('🔄 Joining interview room:', roomId);
 
         const res = await axios.post(
           `/api/interview-schedule/room/${roomId}/join`,
@@ -24,7 +24,7 @@ const InterviewJoin = () => {
           { withCredentials: true }
         );
 
-        console.log('✅ Join response:', res.data);
+        // console.log('✅ Join response:', res.data);
 
         if (res.data.success && !cancelled) {
           const role = res.data.role;

@@ -7,8 +7,7 @@ export const getAvailableSlots = async (interviewerId, date, timezone = 'UTC') =
   const targetDate = moment.utc(date).startOf('day');
   const dayOfWeek = targetDate.day(); // 0=Sun, 6=Sat
 
-  console.log('Fetching slots for interviewer:', interviewerId, 'on day:', dayOfWeek, 'date:', targetDate.format('YYYY-MM-DD'));
-
+  
   // Find availability for this day
   const availabilities = await InterviewerAvailability.find({
     interviewerId,
@@ -17,7 +16,7 @@ export const getAvailableSlots = async (interviewerId, date, timezone = 'UTC') =
   });
 
   if (availabilities.length === 0) {
-    console.log('No availability found for this interviewer on this day');
+    // console.log('No availability found for this interviewer on this day');
     return [];
   }
 
@@ -85,6 +84,6 @@ export const getAvailableSlots = async (interviewerId, date, timezone = 'UTC') =
     }
   }
 
-  console.log('Found', slots.length, 'available slots');
+  // console.log('Found', slots.length, 'available slots');
   return slots;
 };

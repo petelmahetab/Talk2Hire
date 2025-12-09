@@ -10,14 +10,10 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASSWORD
   }
 });
-// console.log("Loaded .env:", process.env);
+
 const testEmail = async () => {
   try {
-    console.log('📧 Testing email configuration...');
-    console.log('Email Service:', process.env.EMAIL_SERVICE);
-    console.log('Email User:', process.env.EMAIL_USER);
-    console.log('Password set:', process.env.EMAIL_PASSWORD ? 'Yes ✅' : 'No ❌');
-
+ 
     const info = await transporter.sendMail({
       from: `"Talk2Hire Test" <${process.env.EMAIL_USER}>`,
       to: process.env.EMAIL_USER, // Send to yourself
@@ -29,9 +25,6 @@ const testEmail = async () => {
       `
     });
 
-    console.log('✅ Email sent successfully!');
-    console.log('Message ID:', info.messageId);
-    console.log('Check your inbox:', process.env.EMAIL_USER);
   } catch (error) {
     console.error('❌ Email sending failed:');
     console.error('Error:', error.message);

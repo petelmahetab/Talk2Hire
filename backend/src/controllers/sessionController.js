@@ -65,7 +65,7 @@ export async function getActiveSessions(_, res) {
 
     res.status(200).json({ sessions });
   } catch (error) {
-    console.log("Error in getActiveSessions controller:", error.message);
+    // console.log("Error in getActiveSessions controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -84,7 +84,7 @@ export async function getMyRecentSessions(req, res) {
 
     res.status(200).json({ sessions });
   } catch (error) {
-    console.log("Error in getMyRecentSessions controller:", error.message);
+    // console.log("Error in getMyRecentSessions controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -101,7 +101,7 @@ export async function getSessionById(req, res) {
 
     res.status(200).json({ session });
   } catch (error) {
-    console.log("Error in getSessionById controller:", error.message);
+    // console.log("Error in getSessionById controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -135,7 +135,7 @@ export async function joinSession(req, res) {
 
     res.status(200).json({ session });
   } catch (error) {
-    console.log("Error in joinSession controller:", error.message);
+    // console.log("Error in joinSession controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -172,7 +172,7 @@ export async function endSession(req, res) {
 
     res.status(200).json({ session, message: "Session ended successfully" });
   } catch (error) {
-    console.log("Error in endSession controller:", error.message);
+    // console.log("Error in endSession controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -180,7 +180,7 @@ export async function endSession(req, res) {
 export async function getSessionByCallId(req, res) {
   try {
     const { callId } = req.params;
-console.log("🔍 Looking for session with callId:", callId);
+// console.log("🔍 Looking for session with callId:", callId);
     const session = await Session.findOne({ callId })
       .populate("host", "name email profileImage clerkId")
       .populate("participant", "name email profileImage clerkId");
@@ -189,7 +189,7 @@ console.log("🔍 Looking for session with callId:", callId);
 
     res.status(200).json({ session });
   } catch (error) {
-    console.log("Error in getSessionByCallId controller:", error.message);
+    // console.log("Error in getSessionByCallId controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }

@@ -43,11 +43,6 @@ export const joinScheduledInterview = async (req, res) => {
     const { roomId } = req.params;
     const user = req.user;
 
-    console.log('🔍 Join attempt:', { 
-      roomId, 
-      userEmail: user.email, 
-      clerkId: user.clerkId 
-    });
 
     const interview = await InterviewSchedule.findOne({ roomId });
     
@@ -83,7 +78,7 @@ export const joinScheduledInterview = async (req, res) => {
     const isInterviewer = interview.interviewerId === user.clerkId;
     const isCandidate = interview.candidateEmail.toLowerCase() === user.email.toLowerCase();
 
-    console.log('👤 Role check:', { isInterviewer, isCandidate });
+
 
     if (!isInterviewer && !isCandidate) {
       return res.status(403).json({ 
@@ -104,7 +99,7 @@ export const joinScheduledInterview = async (req, res) => {
         });
       }
 
-      console.log('🏗️ Creating new session for room:', roomId);
+      // console.log('🏗️ Creating new session for room:', roomId);
 
       // FIXED: Create session with proper data
       session = await Session.create({
@@ -128,7 +123,7 @@ export const joinScheduledInterview = async (req, res) => {
             }
           }
         });
-        console.log('✅ Stream video call created');
+        // console.log('✅ Stream video call created');
       } catch (streamError) {
         console.error('❌ Stream video error:', streamError);
       }
@@ -141,7 +136,7 @@ export const joinScheduledInterview = async (req, res) => {
           members: [interview.interviewerId]
         });
         await channel.create();
-        console.log('✅ Chat channel created');
+        // console.log('✅ Chat channel created');
       } catch (chatError) {
         console.error('❌ Chat channel error:', chatError);
       }
@@ -156,7 +151,7 @@ export const joinScheduledInterview = async (req, res) => {
         try {
           const channel = chatClient.channel("messaging", roomId);
           await channel.addMembers([user.clerkId]);
-          console.log('✅ Candidate added to chat');
+          // console.log('✅ Candidate added to chat');
         } catch (chatError) {
           console.error('❌ Add member error:', chatError);
         }
@@ -214,7 +209,7 @@ export const completeScheduledInterview = async (req, res) => {
         await streamClient.video.call("default", roomId).delete({ hard: true });
         const channel = chatClient.channel("messaging", roomId);
         await channel.delete();
-        console.log('✅ Stream resources cleaned up');
+        // console.log('✅ Stream resources cleaned up');
       } catch (e) {
         console.error('❌ Cleanup error:', e);
       }

@@ -50,11 +50,7 @@ router.post('/book', async (req, res) => {
       meetingLink: `${process.env.CLIENT_URL}/interview/join/${roomId}`
     });
 
-    console.log('\n=====================================');
-    console.log('MOCK INTERVIEW BOOKED!');
-    console.log('Room ID:', roomId);
-    console.log('JOIN LINK →', `${process.env.CLIENT_URL}/interview/join/${roomId}`);
-    console.log('=====================================\n');
+   
 
     await sendBookingConfirmationEmails(interview.toObject());
 

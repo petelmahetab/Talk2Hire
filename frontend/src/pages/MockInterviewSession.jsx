@@ -122,7 +122,7 @@ function MockInterviewSession() {
 
         const handleMemberAdded = (event) => {
             setOnlineMembers(prev => new Set(prev).add(event.user.id));
-            console.log("Member online:", event.user.id);
+            // console.log("Member online:", event.user.id);
         };
 
         const handleMemberRemoved = (event) => {
@@ -156,7 +156,7 @@ function MockInterviewSession() {
             if (event.type === "timer.start" && event.data) {
                 const { startTimestamp, durationSeconds } = event.data;
 
-                console.log("Timer sync received on this client:", { startTimestamp, durationSeconds });
+                // console.log("Timer sync received on this client:", { startTimestamp, durationSeconds });
 
                 setInterviewStartedAt(startTimestamp);
                 setTimeLeft(durationSeconds);
@@ -198,7 +198,7 @@ function MockInterviewSession() {
                 type: "timer.start",
                 data: { startTimestamp, durationSeconds }
             });
-            console.log("Timer start event sent successfully");
+            // console.log("Timer start event sent successfully");
         } catch (err) {
             console.error("Failed to send timer.start:", err);
             toast.error("Timer sync failed");
@@ -305,7 +305,7 @@ function MockInterviewSession() {
 
     // ──────────────────────────────────────────────────────────────
     // Language / Problem change
-    // ──────────────────────────────────────────────────────────────
+   
     useEffect(() => {
         if (problemData?.starterCode?.[selectedLanguage]) {
             setCode(problemData.starterCode[selectedLanguage]);
@@ -353,9 +353,8 @@ function MockInterviewSession() {
         );
     }
 
-    // ──────────────────────────────────────────────────────────────
     // Main Render
-    // ──────────────────────────────────────────────────────────────
+   
     return (
         <div className="h-screen bg-base-100 flex flex-col">
             <Navbar />

@@ -34,4 +34,4 @@ cron.schedule('* * * * *', async () => {
   }
 });
 
-console.log('Reminder jobs scheduled');
+// console.log('Reminder jobs scheduled');
