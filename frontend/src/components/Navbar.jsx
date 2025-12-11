@@ -2,10 +2,11 @@ import { Link, useLocation } from "react-router";
 import { BookOpenIcon, School, SparklesIcon } from "lucide-react";
 import { UserButton } from "@clerk/clerk-react";
 
+
 function Navbar() {
   const location = useLocation();
 
-  
+const faviconUrl = "/Favicon.png";   
 
   const isActive = (path) => location.pathname === path;
 
@@ -17,8 +18,9 @@ function Navbar() {
           to="/"
           className="group flex items-center gap-3 hover:scale-105 transition-transform duration-200"
         >
-          <div className="size-10 rounded-xl bg-gradient-to-r from-primary via-secondary to-accent flex items-center justify-center shadow-lg ">
-            <SparklesIcon className="size-6 text-white" />
+          <div className="size-15 rounded-xl bg-black flex items-center justify-center shadow-lg ">
+            {/* <SparklesIcon className="size-6 text-white" /> */}
+            <img src={faviconUrl} alt="logo" className="size-10 rounded-full hover:scale-110 transition-transform duration-200" />
           </div>
 
           <div className="flex flex-col">
