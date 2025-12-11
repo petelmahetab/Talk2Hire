@@ -11,7 +11,7 @@ import ActiveSessions from "../components/ActiveSessions";
 import RecentSessions from "../components/RecentSessions";
 import CreateSessionModal from "../components/CreateSessionModal";
 
-import { Calendar, Users, Settings, Sparkles, Command, Zap,Inbox } from 'lucide-react';
+import { Calendar, Users, Settings, Sparkles, Command, Zap, Inbox } from 'lucide-react';
 
 function DashboardPage() {
   const navigate = useNavigate();
@@ -39,7 +39,7 @@ function DashboardPage() {
       }
     );
   };
-
+  // console.log("Current API URL →", import.meta.env.VITE_API_URL);
   const activeSessions = activeSessionsData?.sessions || [];
   const recentSessions = recentSessionsData?.sessions || [];
 
@@ -53,7 +53,6 @@ function DashboardPage() {
       <div className="min-h-screen bg-base-200">
         <Navbar />
         <WelcomeSection onCreateSession={() => setShowCreateModal(true)} />
-
         {/* HERO SECTION — ONLY NAVBAR + 3 BUTTONS + 1 LINE */}
         <div className="max-w-7xl mx-auto px-6 pb-32">
           {/* 3 Beautiful Buttons */}
@@ -137,7 +136,7 @@ function DashboardPage() {
             {/* Heading + 2 Lines */}
             <div className="text-center mb-16">
               <h2 className="text-6xl font-black bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent mb-6">
-                 Coding Sessions
+                Coding Sessions
               </h2>
               <p className="text-2xl text-base-content/70 mb-4">
                 Practice with friends or jump into live mock interviews

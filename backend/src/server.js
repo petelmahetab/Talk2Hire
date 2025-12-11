@@ -21,28 +21,49 @@ const __dirname = path.resolve();
 
 // middleware
 app.use(express.json());
-// credentials:true meaning?? => server allows a browser to include cookies on request
-app.use(cors({ origin: ENV.CLIENT_URL, credentials: true }));
-app.use(clerkMiddleware()); // this adds auth field to request object: req.auth()
+app.set('trust proxy', 1);
 
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://talk2hire-f1kx.onrender.com'
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
+app.use(clerkMiddleware());
+
+// ✅ HEALTH CHECK ROUTE (BEFORE EVERYTHING)
+app.get("/health", (req, res) => {
+  res.status(200).json({ msg: "api is up and running" });
+});
+
+// ✅ API ROUTES (MUST COME BEFORE STATIC FILES!)
 app.use("/api/inngest", serve({ client: inngest, functions }));
 app.use("/api/chat", chatRoutes);
 app.use("/api/sessions", sessionRoutes);
 app.use('/api/scheduling', schedulingRoutes);
 app.use('/api', interviewersRoutes);
-// app.use('/api/interviews', interviewScheduleRoutes);
 app.use("/api/interview-schedule", interviewScheduleRoutes);
 
-app.get("/health", (req, res) => {
-  res.status(200).json({ msg: "api is up and running" });
-});
-
-// make our app ready for deployment
+// ✅ SERVE FRONTEND STATIC FILES (AFTER API ROUTES)
 if (ENV.NODE_ENV === "production") {
-  app.use(express.static(path.join(__dirname, "../frontend/dist")));
-
-  app.get("/{*any}", (req, res) => {
-    res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
+  const frontendPath = path.join(__dirname, "../frontend/dist");
+  
+  app.use(express.static(frontendPath));
+  
+  // ✅ CATCH-ALL ROUTE (MUST BE LAST!)
+  // This only catches routes that don't match /api/* or /health
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(frontendPath, "index.html"));
   });
 }
 
