@@ -6,16 +6,18 @@ export const sessionApi = {
     const response = await axiosInstance.post("/sessions", data);
     return response.data;
   },
-
-  getActiveSessions: async () => {
-    const response = await axiosInstance.get("/sessions/active");
+getActiveSessions: async () => {
+    const headers = await getAuthHeaders();
+    const response = await axiosInstance.get("/sessions/active", { headers });
     return response.data;
   },
-
+  
   getMyRecentSessions: async () => {
-    const response = await axiosInstance.get("/sessions/my-recent");
+    const headers = await getAuthHeaders();
+    const response = await axiosInstance.get("/sessions/my-recent", { headers });
     return response.data;
   },
+
 
   getSessionById: async (id) => {
     // Check if id is a UUID (callId) or MongoDB ObjectId
