@@ -55,17 +55,17 @@ app.use('/api', interviewersRoutes);
 app.use("/api/interview-schedule", interviewScheduleRoutes);
 
 // ✅ SERVE FRONTEND STATIC FILES (AFTER API ROUTES)
-if (ENV.NODE_ENV === "production") {
-  const frontendPath = path.join(__dirname, "../frontend/dist");
+// if (ENV.NODE_ENV === "production") {
+//   const frontendPath = path.join(__dirname, "../frontend/dist");
   
-  app.use(express.static(frontendPath));
+//   app.use(express.static(frontendPath));
   
-  // ✅ CATCH-ALL ROUTE (MUST BE LAST!)
-  // This only catches routes that don't match /api/* or /health
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(frontendPath, "index.html"));
-  });
-}
+//   // ✅ CATCH-ALL ROUTE (MUST BE LAST!)
+//   // This only catches routes that don't match /api/* or /health
+//   app.get("*", (req, res) => {
+//     res.sendFile(path.join(frontendPath, "index.html"));
+//   });
+// }
 
 const startServer = async () => {
   try {
