@@ -5,22 +5,34 @@ export const protectRoute = [
   requireAuth(),
   async (req, res, next) => {
     try {
-      const clerkId = req.auth().userId;
+      console.log("=== PROTECT ROUTE DEBUG ===");
+      console.log("📍 Path:", req.path);
+      console.log("🔐 req.auth object:", JSON.stringify(req.auth, null, 2));
+      console.log("📋 Headers:", JSON.stringify(req.headers, null, 2));
+      
+      const clerkId = req.auth.userId;
+      console.log("🆔 Extracted clerkId:", clerkId);
+      
+      if (!clerkId) {
+        console.log("❌ No clerkId found - returning 401");
+        return res.status(401).json({ message: "Unauthorized - invalid token" });
+      }
 
-      if (!clerkId) return res.status(401).json({ message: "Unauthorized - invalid token" });
-
-      // find user in db by clerk ID
       const user = await User.findOne({ clerkId });
+      console.log("👤 User lookup result:", user ? `Found: ${user.email}` : "Not found");
+      
+      if (!user) {
+        console.log("❌ User not in DB - returning 404");
+        return res.status(404).json({ message: "User not found" });
+      }
 
-      if (!user) return res.status(404).json({ message: "User not found" });
-
-      // attach user to req
       req.user = user;
-
+      console.log("✅ Auth successful, proceeding to route");
       next();
     } catch (error) {
-      console.error("Error in protectRoute middleware", error);
-      res.status(500).json({ message: "Internal Server Error" });
+      console.error("❌ Error in protectRoute middleware:", error);
+      console.error("Stack:", error.stack);
+      res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
   },
 ];
