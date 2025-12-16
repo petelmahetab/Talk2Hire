@@ -11,6 +11,9 @@ import { Link } from "react-router";
 import { getDifficultyBadgeClass } from "../lib/utils";
 
 function ActiveSessions({ sessions, isLoading, isUserInSession }) {
+  console.log("ActiveSessions - sessions:", sessions);
+  console.log("ActiveSessions - isLoading:", isLoading);
+
   return (
     <div className="lg:col-span-2 card bg-base-100 border-2 border-primary/20 hover:border-primary/30 h-full">
       <div className="card-body">

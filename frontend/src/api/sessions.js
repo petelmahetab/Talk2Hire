@@ -1,6 +1,24 @@
 
 import axiosInstance from "../lib/axios";
 
+const getAuthHeaders = async () => {
+  try {
+    // Get the token from Clerk
+    const token = await window.Clerk?.session?.getToken();
+    
+    if (token) {
+      return {
+        Authorization: `Bearer ${token}`,
+      };
+    }
+    
+    return {};
+  } catch (error) {
+    console.error("Error getting auth token:", error);
+    return {};
+  }
+};
+
 export const sessionApi = {
   createSession: async (data) => {
     const response = await axiosInstance.post("/sessions", data);

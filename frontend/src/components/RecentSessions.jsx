@@ -3,6 +3,10 @@ import { getDifficultyBadgeClass } from "../lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
 function RecentSessions({ sessions, isLoading }) {
+
+  console.log("RecentSessions - sessions:", sessions);
+  console.log("RecentSessions - isLoading:", isLoading);
+
   return (
     <div className="card bg-base-100 border-2 border-accent/20 hover:border-accent/30 mt-8">
       <div className="card-body">
