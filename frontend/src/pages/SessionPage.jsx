@@ -143,17 +143,16 @@ function SessionPage() {
 
   const handleProblemChange = async (newProblemTitle) => {
     try {
-      await fetch(`/api/sessions/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ problem: newProblemTitle }),
+      await axiosInstance.patch(`/sessions/${id}`, { 
+        problem: newProblemTitle 
       });
       refetch();
     } catch (err) {
+      console.error("Failed to update problem:", err);
       alert("Failed to update problem");
     }
   };
+
 
   const admitCandidate = () => {
     setCandidateWaiting(false);
