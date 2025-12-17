@@ -20,6 +20,7 @@ import OutputPanel from "../components/OutputPanel";
 import useStreamClient from "../hooks/useStreamClient";
 import { StreamCall, StreamVideo } from "@stream-io/video-react-sdk";
 import VideoCallUI from "../components/VideoCallUI";
+import { useAuthAxios } from "../hooks/useAuthAxios";
 
 function SessionPage() {
   const navigate = useNavigate();
@@ -141,19 +142,25 @@ function SessionPage() {
     }
   };
 
-  const handleProblemChange = async (newProblemTitle) => {
+  const authAxios = useAuthAxios();
+
+const handleProblemChange = async (newProblemTitle) => {
     try {
-      await axiosInstance.patch(`/sessions/${id}`, { 
+      console.log("🔄 Updating problem to:", newProblemTitle);
+      
+      // Use authAxios instead of axiosInstance
+      await authAxios.patch(`/sessions/${id}`, { 
         problem: newProblemTitle 
       });
+      
+      console.log("✅ Problem updated successfully");
       refetch();
     } catch (err) {
-      console.error("Failed to update problem:", err);
-      alert("Failed to update problem");
+      console.error("❌ Failed to update problem:", err);
+      alert("Failed to update problem: " + (err.response?.data?.message || err.message));
     }
   };
-
-
+  
   const admitCandidate = () => {
     setCandidateWaiting(false);
     // You can add real admission logic here later
