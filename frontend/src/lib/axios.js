@@ -15,7 +15,8 @@ axiosInstance.interceptors.request.use(
       url: config.url,
       method: config.method,
       baseURL: config.baseURL,
-      headers: config.headers,
+      fullURL: `${config.baseURL}${config.url}`,
+      hasAuth: !!config.headers.Authorization,
     });
     return config;
   },
@@ -45,26 +46,5 @@ axiosInstance.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
-export const useAuthAxios = () => {
-  const { getToken } = useAuth();
-
-  const axiosInstance = axios.create({
-    baseURL: `${import.meta.env.VITE_API_URL}/api`,
-    withCredentials: true,
-  });
-
-  // Add token interceptor
-  axiosInstance.interceptors.request.use(async (config) => {
-    const token = await getToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  });
-
-  return axiosInstance;
-};
-
 
 export default axiosInstance;
