@@ -1,41 +1,23 @@
-
+// frontend/src/api/sessions.js
 import axiosInstance from "../lib/axios";
 
-const getAuthHeaders = async () => {
-  try {
-    // Get the token from Clerk
-    const token = await window.Clerk?.session?.getToken();
-    
-    if (token) {
-      return {
-        Authorization: `Bearer ${token}`,
-      };
-    }
-    
-    return {};
-  } catch (error) {
-    console.error("Error getting auth token:", error);
-    return {};
-  }
-};
+
 
 export const sessionApi = {
   createSession: async (data) => {
     const response = await axiosInstance.post("/sessions", data);
     return response.data;
   },
-getActiveSessions: async () => {
-    const headers = await getAuthHeaders();
-    const response = await axiosInstance.get("/sessions/active", { headers });
+
+  getActiveSessions: async () => {
+    const response = await axiosInstance.get("/sessions/active");
     return response.data;
   },
   
   getMyRecentSessions: async () => {
-    const headers = await getAuthHeaders();
-    const response = await axiosInstance.get("/sessions/my-recent", { headers });
+    const response = await axiosInstance.get("/sessions/my-recent");
     return response.data;
   },
-
 
   getSessionById: async (id) => {
     // Check if id is a UUID (callId) or MongoDB ObjectId
@@ -74,7 +56,7 @@ getActiveSessions: async () => {
   },
 
   getStreamToken: async () => {
-    const response = await axiosInstance.get(`/chat/token`);
+    const response = await axiosInstance.get("/chat/token");
     return response.data;
   },
 };
