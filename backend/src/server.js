@@ -23,6 +23,15 @@ const __dirname = path.resolve();
 app.use(express.json());
 app.set('trust proxy', 1);
 
+app.use((req, res, next) => {
+  console.log('🔍 Incoming Request:', {
+    method: req.method,
+    url: req.url,
+    origin: req.headers.origin,
+    headers: req.headers
+  });
+  next();
+});
 const allowedOrigins = [
   'http://localhost:5173',
   'https://talk2hire-f1kx.onrender.com'
@@ -30,13 +39,17 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
+    console.log('🌍 CORS Check - Origin:', origin);
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.error('❌ CORS Blocked:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(clerkMiddleware());
