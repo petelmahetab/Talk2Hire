@@ -1,6 +1,8 @@
 import { useUser } from "@clerk/clerk-react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
+import { useEffect } from "react";
+import axiosInstance from "./lib/axios";
 
 // Pages
 import HomePage from "./pages/HomePage";
@@ -8,7 +10,7 @@ import DashboardPage from "./pages/DashboardPage";
 import ProblemsPage from "./pages/ProblemsPage";
 import ProblemPage from "./pages/ProblemPage";
 import SessionPage from "./pages/SessionPage";
-import MockInterviewSession from "./pages/MockInterviewSession"; // ← ADD THIS
+import MockInterviewSession from "./pages/MockInterviewSession";
 import InterviewJoin from "./pages/InterviewJoin";
 import BookInterview from "./pages/BookInterview";
 import MyInterviews from "./pages/MyInterviews";
@@ -17,7 +19,47 @@ import RoomPage from "./pages/RoomPage";
 import InterviewersPage from "./pages/InterviewersPage";
 
 function App() {
-  const { isSignedIn, isLoaded } = useUser();
+  const { isSignedIn, isLoaded, user } = useUser();
+
+  // ✅ CRITICAL: Setup global auth interceptor
+  useEffect(() => {
+    if (!isSignedIn || !user) {
+      console.log("⏭️ User not signed in, skipping auth setup");
+      return;
+    }
+
+    console.log("🔐 Setting up global auth interceptor for user:", user.id);
+
+    // Add request interceptor to inject auth token
+    const requestInterceptor = axiosInstance.interceptors.request.use(
+      async (config) => {
+        try {
+          // Get fresh token from Clerk
+          const token = await user.getToken();
+          
+          if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+            console.log("✅ Auth token added to request:", config.url);
+          } else {
+            console.warn("⚠️ No token available for request:", config.url);
+          }
+        } catch (error) {
+          console.error("❌ Failed to get auth token:", error);
+        }
+        return config;
+      },
+      (error) => {
+        console.error("❌ Request interceptor error:", error);
+        return Promise.reject(error);
+      }
+    );
+
+    // Cleanup function to remove interceptor
+    return () => {
+      console.log("🧹 Cleaning up auth interceptor");
+      axiosInstance.interceptors.request.eject(requestInterceptor);
+    };
+  }, [isSignedIn, user]);
 
   if (!isLoaded) return null;
 
@@ -42,20 +84,14 @@ function App() {
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/problems" element={<ProblemsPage />} />
                 <Route path="/problem/:id" element={<ProblemPage />} />
-                
-                {/* Practice Session (old flow) */}
                 <Route path="/session/:id" element={<SessionPage />} />
-                
-                {/* Mock Interview Session (new flow) - ADD THIS */}
                 <Route path="/mock-interview/:roomId" element={<MockInterviewSession />} />
-                
                 <Route path="/book-interview/:interviewerId" element={<BookInterview />} />
                 <Route path="/my-interviews" element={<MyInterviews />} />
                 <Route path="/availability" element={<AvailabilitySettings />} />
                 <Route path="/schedule" element={<AvailabilitySettings />} />
                 <Route path="/room/:id" element={<RoomPage />} />
                 <Route path="/interviewers" element={<InterviewersPage />} />
-
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             ) : (
@@ -76,7 +112,6 @@ function App() {
           zIndex: 9999,
         }}
         toastOptions={{
-          // Default styles for all toasts
           style: {
             background: '#1e1e2d',
             color: '#fff',
@@ -89,8 +124,6 @@ function App() {
             backdropFilter: 'blur(10px)',
           },
           duration: 5000,
-
-          // Success Toast (All test cases passed!)
           success: {
             duration: 8000,
             icon: '🎉',
@@ -100,8 +133,6 @@ function App() {
               border: 'none',
             },
           },
-
-          // Error Toast (Test cases failed / Time up)
           error: {
             duration: 7000,
             icon: '❌',
@@ -110,14 +141,10 @@ function App() {
               color: 'white',
             },
           },
-
-          // Loading Toast
           loading: {
             duration: 10000,
             icon: '⏳',
           },
-
-          // Custom toast (like End Interview confirmation)
           custom: {
             style: {
               background: '#0f172a',
