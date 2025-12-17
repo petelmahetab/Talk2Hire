@@ -17,6 +17,13 @@ const app = express();
 app.use(express.json());
 app.set('trust proxy', 1);
 
+// Logging middleware
+app.use((req, res, next) => {
+  console.log('📍', req.method, req.url);
+  console.log('🔑 Auth header:', req.headers.authorization ? 'Present' : 'Missing');
+  next();
+});
+
 const allowedOrigins = [
   'http://localhost:5173',
   'https://talk2hire-f1kx.onrender.com'
@@ -31,24 +38,29 @@ app.use(cors({
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.options('*', cors());
 
-// ⚠️ CRITICAL: Apply Clerk ONLY to routes that need it
-// For API routes, authentication is handled by protectRoute middleware
+// ✅ Apply Clerk middleware GLOBALLY - it will parse the token
+app.use(clerkMiddleware());
+
+// Debug middleware to check what Clerk extracted
 app.use((req, res, next) => {
-  if (req.path === '/health' || req.path === '/' || req.path.startsWith('/api/')) {
-    // Skip Clerk middleware for these routes
-    return next();
+  if (req.path.startsWith('/api/')) {
+    console.log('🔍 Clerk auth object:', req.auth);
   }
-  return clerkMiddleware()(req, res, next);
+  next();
 });
 
 app.get("/", (req, res) => {
-  res.json({ message: 'Talk2Hire API', status: 'running' });
+  res.json({ 
+    message: 'Talk2Hire API', 
+    status: 'running',
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.get("/health", (req, res) => {
@@ -62,21 +74,31 @@ app.use('/api/scheduling', schedulingRoutes);
 app.use('/api', interviewersRoutes);
 app.use("/api/interview-schedule", interviewScheduleRoutes);
 
+// 404 handler
 app.use((req, res) => {
+  console.log('❌ 404:', req.method, req.url);
   res.status(404).json({ error: 'Route not found' });
 });
 
+// Error handler
 app.use((err, req, res, next) => {
-  console.error('Error:', err.message);
+  console.error('💥 Error:', err.message);
   res.status(500).json({ error: err.message });
 });
 
 const startServer = async () => {
   try {
     await connectDB();
-    app.listen(ENV.PORT, () => console.log("Server running on port:", ENV.PORT));
+    app.listen(ENV.PORT, () => {
+      console.log("✅ Server running on port:", ENV.PORT);
+      console.log("✅ Environment:", ENV.NODE_ENV);
+      console.log("✅ Clerk Keys:", {
+        publishable: ENV.CLERK_PUBLISHABLE_KEY ? '✅ Set' : '❌ Missing',
+        secret: ENV.CLERK_SECRET_KEY ? '✅ Set' : '❌ Missing'
+      });
+    });
   } catch (error) {
-    console.error("Error starting server:", error);
+    console.error("💥 Error starting server:", error);
   }
 };
 
