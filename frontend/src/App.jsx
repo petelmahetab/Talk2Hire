@@ -34,14 +34,26 @@ function App() {
     const requestInterceptor = axiosInstance.interceptors.request.use(
       async (config) => {
         try {
-          // Get fresh token from Clerk
-          const token = await user.getToken();
+          // ✅ TRY MULTIPLE METHODS to get token
+          let token = null;
+          
+          // Method 1: Direct from window.Clerk (most reliable)
+          if (window.Clerk?.session) {
+            token = await window.Clerk.session.getToken();
+            console.log("✅ Got token from window.Clerk.session");
+          }
+          
+          // Method 2: Fallback to user object
+          if (!token && typeof user.getToken === 'function') {
+            token = await user.getToken();
+            console.log("✅ Got token from user.getToken()");
+          }
           
           if (token) {
             config.headers.Authorization = `Bearer ${token}`;
             console.log("✅ Auth token added to request:", config.url);
           } else {
-            console.warn("⚠️ No token available for request:", config.url);
+            console.error("⚠️ No token available for request:", config.url);
           }
         } catch (error) {
           console.error("❌ Failed to get auth token:", error);
