@@ -13,19 +13,22 @@ const InterviewersPage = () => {
     fetchInterviewers();
   }, []);
 
-  const fetchInterviewers = async () => {
-    try {
-      const response = await schedulingApi.getInterviewers();
-      if (response.success) {
-        setInterviewers(response.interviewers);
-      }
-    } catch (error) {
-      console.error('Error fetching interviewers:', error);
-      alert('Failed to load interviewers');
-    } finally {
-      setLoading(false);
+ const fetchInterviewers = async () => {
+  try {
+    setLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const response = await schedulingApi.getInterviewers();
+    if (response.success) {
+      setInterviewers(response.interviewers);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching interviewers:', error);
+    toast.error(error.message || 'Failed to load interviewers');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const getDayName = (dayNum) => {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
