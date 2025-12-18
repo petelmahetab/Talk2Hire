@@ -10,33 +10,95 @@ const api = axios.create({
   }
 });
 
-// Request interceptor to add auth token
-api.interceptors.request.use(async (config) => {
-  // Skip token for Clerk requests
-  if (config.url?.includes('/clerk.') || config.url?.includes('clerk.com')) {
+// Helper function to get token with retry logic
+const getClerkToken = async (retries = 3, delay = 100) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      // Wait for Clerk to be ready
+      if (!window.Clerk) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+
+      // Check if user is signed in
+      if (!window.Clerk.session) {
+        console.warn('⚠️ No Clerk session available');
+        return null;
+      }
+
+      const token = await window.Clerk.session.getToken();
+      if (token) {
+        return token;
+      }
+    } catch (error) {
+      console.error(`❌ Token fetch attempt ${i + 1} failed:`, error);
+      if (i < retries - 1) {
+        await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+      }
+    }
+  }
+  
+  return null;
+};
+
+// Request interceptor with improved error handling
+api.interceptors.request.use(
+  async (config) => {
+    // Skip token for public endpoints or Clerk URLs
+    if (
+      config.url?.includes('/clerk.') || 
+      config.url?.includes('clerk.com') ||
+      config.url?.includes('/health')
+    ) {
+      return config;
+    }
+
+    try {
+      const token = await getClerkToken();
+      
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+        console.log('✅ Token added to request:', config.url);
+      } else {
+        console.warn('⚠️ No token available for:', config.url);
+      }
+    } catch (error) {
+      console.error('❌ Token error for:', config.url, error);
+    }
+
     return config;
+  },
+  (error) => {
+    console.error('❌ Request interceptor error:', error);
+    return Promise.reject(error);
   }
+);
 
-  try {
-    // Get token from Clerk
-    let token = null;
-    
-    if (window.Clerk?.session) {
-      token = await window.Clerk.session.getToken();
+// Response interceptor for better error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error('❌ API Error:', {
+      url: error.config?.url,
+      status: error.response?.status,
+      message: error.response?.data?.message || error.message
+    });
+
+    // Handle 401 Unauthorized
+    if (error.response?.status === 401) {
+      console.error('🚫 Unauthorized - Token may be invalid or expired');
+      // Optionally redirect to sign in
+      // window.location.href = '/sign-in';
     }
-    
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-      console.log('✅ Token added to request:', config.url);
-    } else {
-      console.warn('⚠️ No token available for:', config.url);
+
+    // Handle 404
+    if (error.response?.status === 404) {
+      console.error('🔍 Resource not found:', error.config?.url);
     }
-  } catch (error) {
-    console.error('❌ Token error:', error);
+
+    return Promise.reject(error);
   }
-
-  return config;
-});
+);
 
 export const schedulingApi = {
   // Get available slots
