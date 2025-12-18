@@ -39,16 +39,17 @@ const AvailabilitySettings = () => {
   }, [user]);
 
   const fetchAvailabilities = async () => {
-    setLoading(true);
-    try {
-      const response = await schedulingApi.getAvailability(user.id);
-      if (response.success) setAvailabilities(response.availabilities);
-    } catch (error) {
-      toast.error('Failed to load availability');
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  try {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const response = await schedulingApi.getAvailability(user.id);
+    if (response.success) setAvailabilities(response.availabilities);
+  } catch (error) {
+    toast.error('Failed to load availability');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleSaveAvailability = async () => {
     setSaving(true);
