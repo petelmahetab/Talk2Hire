@@ -23,6 +23,8 @@ import VideoCallUI from "../components/VideoCallUI";
 import axios from "axios";
 import toast from "react-hot-toast";
 import confetti from "canvas-confetti";
+import schedulingApi from '../api/schedulingApi';
+
 
 function MockInterviewSession() {
     const navigate = useNavigate();
@@ -68,52 +70,49 @@ function MockInterviewSession() {
     // ──────────────────────────────────────────────────────────────
     // Join room
     // ──────────────────────────────────────────────────────────────
-    useEffect(() => {
-        if (!isLoaded || !user) return;
+useEffect(() => {
+    if (!isLoaded || !user) return;
 
-        const joinRoom = async () => {
-            try {
-                setLoading(true);
-                const res = await axios.post(
-                    `/api/interview-schedule/room/${roomId}/join`,
-                    {},
-                    { withCredentials: true }
-                );
+    const joinRoom = async () => {
+        try {
+            setLoading(true);
+            
+            // ✅ Use schedulingApi instead of raw axios
+            const res = await schedulingApi.joinRoom(roomId);
 
-                if (res.data.success) {
-                    setInterview(res.data.interview);
-                    setSession(res.data.session);
+            if (res.success) {
+                setInterview(res.interview);
+                setSession(res.session);
 
-                    const typeToProblems = {
-                        dsa: "Two Sum",
-                        "system-design": "Design URL Shortener",
-                        frontend: "Build Todo App",
-                        backend: "Design REST API",
-                        fullstack: "Two Sum",
-                        behavioral: "Tell Me About Yourself"
-                    };
-                    const defaultProblem = typeToProblems[res.data.interview.interviewType] || "Two Sum";
-                    setSelectedProblem(defaultProblem);
+                const typeToProblems = {
+                    dsa: "Two Sum",
+                    "system-design": "Design URL Shortener",
+                    frontend: "Build Todo App",
+                    backend: "Design REST API",
+                    fullstack: "Two Sum",
+                    behavioral: "Tell Me About Yourself"
+                };
+                const defaultProblem = typeToProblems[res.interview.interviewType] || "Two Sum";
+                setSelectedProblem(defaultProblem);
 
-                    if (isInterviewer) {
-                        // Show popup after 5s only if candidate is online
-                        setTimeout(() => {
-                            if (onlineMembers.size >= 2) {
-                                setCandidateWaiting(true);
-                            }
-                        }, 5000);
-                    }
+                if (isInterviewer) {
+                    setTimeout(() => {
+                        if (onlineMembers.size >= 2) {
+                            setCandidateWaiting(true);
+                        }
+                    }, 5000);
                 }
-            } catch (err) {
-                setError(err.response?.data?.message || "Failed to join room");
-            } finally {
-                setLoading(false);
             }
-        };
+        } catch (err) {
+            console.error('Join room error:', err);
+            setError(err.response?.data?.message || err.message || "Failed to join room");
+        } finally {
+            setLoading(false);
+        }
+    };
 
-        joinRoom();
-    }, [roomId, isLoaded, user, isInterviewer, onlineMembers.size]);
-
+    joinRoom();
+}, [roomId, isLoaded, user, isInterviewer, onlineMembers.size]);
     // ──────────────────────────────────────────────────────────────
     // Track online members in Stream channel
     // ──────────────────────────────────────────────────────────────
@@ -231,16 +230,18 @@ function MockInterviewSession() {
     // ──────────────────────────────────────────────────────────────
     // Time up → auto end
     // ──────────────────────────────────────────────────────────────
-    const handleTimeUp = async () => {
-        toast.error("Time's up!", { icon: "Time's up!" });
-        try {
-            await axios.post(`/api/interview-schedule/room/${roomId}/complete`, {}, { withCredentials: true });
-            toast.success("Interview ended");
-            setTimeout(() => navigate("/dashboard"), 3000);
-        } catch (err) {
-            toast.error("Failed to end interview");
-        }
-    };
+  const handleTimeUp = async () => {
+    toast.error("Time's up!", { icon: "⏰" });
+    try {
+        await schedulingApi.completeInterview(roomId);
+        toast.success("Interview ended");
+        setTimeout(() => navigate("/dashboard"), 3000);
+    } catch (err) {
+        console.error('Complete error:', err);
+        toast.error("Failed to end interview");
+    }
+};
+
 
     const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
@@ -272,36 +273,43 @@ function MockInterviewSession() {
     // ──────────────────────────────────────────────────────────────
     // End interview
     // ──────────────────────────────────────────────────────────────
-    const handleEndInterview = () => {
-        toast(
-            (t) => (
-                <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-2xl max-w-sm">
-                    <h3 className="text-xl font-bold mb-4">End Interview?</h3>
-                    <p className="text-sm opacity-90 mb-6">This will end the session for both.</p>
-                    <div className="flex gap-3 justify-end">
-                        <button onClick={() => toast.dismiss(t.id)} className="px-5 py-2 bg-gray-700 rounded-lg hover:bg-gray-600">Cancel</button>
-                        <button
-                            onClick={async () => {
-                                toast.dismiss(t.id);
-                                const id = toast.loading("Ending...");
-                                try {
-                                    await axios.post(`/api/interview-schedule/room/${roomId}/complete`, {}, { withCredentials: true });
-                                    toast.success("Ended!", { id });
-                                    setTimeout(() => navigate("/dashboard"), 1500);
-                                } catch {
-                                    toast.error("Failed", { id });
-                                }
-                            }}
-                            className="px-6 py-2 bg-red-600 rounded-lg hover:bg-red-700 font-medium"
-                        >
-                            End Now
-                        </button>
-                    </div>
+const handleEndInterview = () => {
+    toast(
+        (t) => (
+            <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-2xl max-w-sm">
+                <h3 className="text-xl font-bold mb-4">End Interview?</h3>
+                <p className="text-sm opacity-90 mb-6">This will end the session for both.</p>
+                <div className="flex gap-3 justify-end">
+                    <button 
+                        onClick={() => toast.dismiss(t.id)} 
+                        className="px-5 py-2 bg-gray-700 rounded-lg hover:bg-gray-600"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={async () => {
+                            toast.dismiss(t.id);
+                            const id = toast.loading("Ending...");
+                            try {
+                                await schedulingApi.completeInterview(roomId);
+                                toast.success("Ended!", { id });
+                                setTimeout(() => navigate("/dashboard"), 1500);
+                            } catch (err) {
+                                console.error('End error:', err);
+                                toast.error("Failed", { id });
+                            }
+                        }}
+                        className="px-6 py-2 bg-red-600 rounded-lg hover:bg-red-700 font-medium"
+                    >
+                        End Now
+                    </button>
                 </div>
-            ),
-            { duration: Infinity }
-        );
-    };
+            </div>
+        ),
+        { duration: Infinity }
+    );
+};
+
 
     // ──────────────────────────────────────────────────────────────
     // Language / Problem change
