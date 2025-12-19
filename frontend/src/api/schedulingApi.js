@@ -14,13 +14,11 @@ const api = axios.create({
 const getClerkToken = async (retries = 3, delay = 100) => {
   for (let i = 0; i < retries; i++) {
     try {
-      // Wait for Clerk to be ready
       if (!window.Clerk) {
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
 
-      // Check if user is signed in
       if (!window.Clerk.session) {
         console.warn('⚠️ No Clerk session available');
         return null;
@@ -44,7 +42,6 @@ const getClerkToken = async (retries = 3, delay = 100) => {
 // Request interceptor with improved error handling
 api.interceptors.request.use(
   async (config) => {
-    // Skip token for public endpoints or Clerk URLs
     if (
       config.url?.includes('/clerk.') || 
       config.url?.includes('clerk.com') ||
@@ -84,14 +81,10 @@ api.interceptors.response.use(
       message: error.response?.data?.message || error.message
     });
 
-    // Handle 401 Unauthorized
     if (error.response?.status === 401) {
       console.error('🚫 Unauthorized - Token may be invalid or expired');
-      // Optionally redirect to sign in
-      // window.location.href = '/sign-in';
     }
 
-    // Handle 404
     if (error.response?.status === 404) {
       console.error('🔍 Resource not found:', error.config?.url);
     }
@@ -101,10 +94,12 @@ api.interceptors.response.use(
 );
 
 export const schedulingApi = {
+  // ==================== SCHEDULING ROUTES (/api/scheduling) ====================
+  
   // Get available slots
   getAvailableSlots: async (interviewerId, startDate, endDate, timezone = 'UTC') => {
     try {
-      const response = await api.get(`/api/interview-schedule/available-slots/${interviewerId}`, {
+      const response = await api.get(`/api/scheduling/available-slots/${interviewerId}`, {
         params: { startDate, endDate, timezone }
       });
       return response.data;
@@ -117,7 +112,7 @@ export const schedulingApi = {
   // Book interview
   bookInterview: async (bookingData) => {
     try {
-      const response = await api.post('/api/interview-schedule/book', bookingData);
+      const response = await api.post('/api/scheduling/book', bookingData);
       return response.data;
     } catch (error) {
       console.error('Error booking interview:', error);
@@ -128,7 +123,7 @@ export const schedulingApi = {
   // Get my interviews
   getMyInterviews: async (role = 'candidate', status = null, upcoming = false) => {
     try {
-      const response = await api.get('/api/interview-schedule/my-interviews', {
+      const response = await api.get('/api/scheduling/my-interviews', {
         params: { role, status, upcoming }
       });
       return response.data;
@@ -141,7 +136,7 @@ export const schedulingApi = {
   // Cancel interview
   cancelInterview: async (id, reason = '') => {
     try {
-      const response = await api.delete(`/api/interview-schedule/${id}`, {
+      const response = await api.delete(`/api/scheduling/${id}`, {
         data: { reason }
       });
       return response.data;
@@ -154,7 +149,7 @@ export const schedulingApi = {
   // Set availability
   setAvailability: async (availabilityData) => {
     try {
-      const response = await api.post('/api/interview-schedule/availability', availabilityData);
+      const response = await api.post('/api/scheduling/availability', availabilityData);
       return response.data;
     } catch (error) {
       console.error('Error setting availability:', error);
@@ -165,7 +160,7 @@ export const schedulingApi = {
   // Get availability
   getAvailability: async (interviewerId) => {
     try {
-      const response = await api.get(`/api/interview-schedule/availability/${interviewerId}`);
+      const response = await api.get(`/api/scheduling/availability/${interviewerId}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching availability:', error);
@@ -176,7 +171,7 @@ export const schedulingApi = {
   // Delete availability
   deleteAvailability: async (id) => {
     try {
-      const response = await api.delete(`/api/interview-schedule/availability/${id}`);
+      const response = await api.delete(`/api/scheduling/availability/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error deleting availability:', error);
@@ -187,7 +182,7 @@ export const schedulingApi = {
   // Get interviewers list
   getInterviewers: async () => {
     try {
-      const response = await api.get('/api/interview-schedule/interviewers');
+      const response = await api.get('/api/interviewers');
       return response.data;
     } catch (error) {
       console.error('Error fetching interviewers:', error);
@@ -195,6 +190,8 @@ export const schedulingApi = {
     }
   },
 
+  // ==================== INTERVIEW SESSION ROUTES (/api/interview-schedule) ====================
+  
   // Join interview room (for scheduled interviews)
   joinRoom: async (roomId) => {
     try {
