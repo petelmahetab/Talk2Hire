@@ -4,7 +4,7 @@ import { useUser } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 import schedulingApi from '../api/schedulingApi';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Clock, Calendar, Sun, Moon, Coffee, CheckCircle2, Trash2, Sparkles } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, Sun, Moon, Coffee, CheckCircle2, Trash2 } from 'lucide-react';
 
 const AvailabilitySettings = () => {
   const { user } = useUser();
@@ -25,45 +25,83 @@ const AvailabilitySettings = () => {
 
   const [formData, setFormData] = useState({
     dayOfWeek: 1,
-    startTime: '09:00',
-    endTime: '17:00',
-    breakStart: '',
-    breakEnd: '',
+    startHour: '09',
+    startMinute: '00',
+    startPeriod: 'AM',
+    endHour: '05',
+    endMinute: '00',
+    endPeriod: 'PM',
+    breakStartHour: '',
+    breakStartMinute: '',
+    breakStartPeriod: 'AM',
+    breakEndHour: '',
+    breakEndMinute: '',
+    breakEndPeriod: 'PM',
     interviewDuration: 60,
     bufferMinutes: 15,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
   });
+
+  // Generate hours (1-12) and minutes (00-59)
+  const hours = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
+  const minutes = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
 
   useEffect(() => {
     if (user) fetchAvailabilities();
   }, [user]);
 
   const fetchAvailabilities = async () => {
-  setLoading(true);
-  try {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const response = await schedulingApi.getAvailability(user.id);
-    if (response.success) setAvailabilities(response.availabilities);
-  } catch (error) {
-    toast.error('Failed to load availability');
-  } finally {
-    setLoading(false);
-  }
-};
+    setLoading(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await schedulingApi.getAvailability(user.id);
+      if (response.success) setAvailabilities(response.availabilities);
+    } catch (error) {
+      toast.error('Failed to load availability');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Convert 12-hour to 24-hour format
+  const convertTo24Hour = (hour, minute, period) => {
+    let h = parseInt(hour);
+    if (period === 'PM' && h !== 12) h += 12;
+    if (period === 'AM' && h === 12) h = 0;
+    return `${String(h).padStart(2, '0')}:${minute}`;
+  };
+
+  // Convert 24-hour to 12-hour format for display
+  const formatTime = (time) => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
 
   const handleSaveAvailability = async () => {
     setSaving(true);
     try {
+      const startTime = convertTo24Hour(formData.startHour, formData.startMinute, formData.startPeriod);
+      const endTime = convertTo24Hour(formData.endHour, formData.endMinute, formData.endPeriod);
+      
+      let breakTime = { start: null, end: null };
+      if (formData.breakStartHour && formData.breakEndHour) {
+        breakTime = {
+          start: convertTo24Hour(formData.breakStartHour, formData.breakStartMinute, formData.breakStartPeriod),
+          end: convertTo24Hour(formData.breakEndHour, formData.breakEndMinute, formData.breakEndPeriod)
+        };
+      }
+
       const availabilityData = {
         interviewerId: user.id,
         interviewerName: user.fullName,
         dayOfWeek: formData.dayOfWeek,
-        startTime: formData.startTime,
-        endTime: formData.endTime,
-        breakTime: {
-          start: formData.breakStart || null,
-          end: formData.breakEnd || null
-        },
+        startTime,
+        endTime,
+        breakTime,
         interviewDuration: parseInt(formData.interviewDuration),
         bufferMinutes: parseInt(formData.bufferMinutes),
         timezone: formData.timezone
@@ -73,7 +111,14 @@ const AvailabilitySettings = () => {
       if (response.success) {
         toast.success('Availability saved successfully!');
         fetchAvailabilities();
-        setFormData({ ...formData, dayOfWeek: (formData.dayOfWeek + 1) % 7 });
+        setFormData({ 
+          ...formData, 
+          dayOfWeek: (formData.dayOfWeek + 1) % 7,
+          breakStartHour: '',
+          breakStartMinute: '',
+          breakEndHour: '',
+          breakEndMinute: ''
+        });
       }
     } catch (error) {
       toast.error('Failed to save availability');
@@ -95,15 +140,41 @@ const AvailabilitySettings = () => {
     }
   };
 
-  // 12-HOUR FORMAT FUNCTION — ADDED HERE
-  const formatTime = (time) => {
-    if (!time) return '';
-    const [hours, minutes] = time.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
+  const TimeSelector = ({ label, hourValue, minuteValue, periodValue, onHourChange, onMinuteChange, onPeriodChange, icon: Icon }) => (
+    <div>
+      <label className="text-xl font-bold text-base-content mb-3 block flex items-center gap-2">
+        {Icon && <Icon className="w-6 h-6 text-primary" />}
+        {label}
+      </label>
+      <div className="flex gap-2">
+        <select
+          value={hourValue}
+          onChange={(e) => onHourChange(e.target.value)}
+          className="flex-1 px-4 py-4 bg-base-200 border border-base-300 rounded-xl text-base-content text-lg focus:outline-none focus:border-primary transition-all"
+        >
+          <option value="">HH</option>
+          {hours.map(h => <option key={h} value={h}>{h}</option>)}
+        </select>
+        <span className="flex items-center text-2xl font-bold">:</span>
+        <select
+          value={minuteValue}
+          onChange={(e) => onMinuteChange(e.target.value)}
+          className="flex-1 px-4 py-4 bg-base-200 border border-base-300 rounded-xl text-base-content text-lg focus:outline-none focus:border-primary transition-all"
+        >
+          <option value="">MM</option>
+          {minutes.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <select
+          value={periodValue}
+          onChange={(e) => onPeriodChange(e.target.value)}
+          className="px-4 py-4 bg-base-200 border border-base-300 rounded-xl text-base-content text-lg font-bold focus:outline-none focus:border-primary transition-all"
+        >
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-base-200">
@@ -126,7 +197,7 @@ const AvailabilitySettings = () => {
         <p className="text-lg md:text-xl text-base-content/70">Let candidates know when you're free to interview</p>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4">
+      <div className="max-w-6xl mx-auto px-4 pb-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Add Slot Form */}
           <div className="bg-base-100 rounded-2xl shadow-xl border border-base-300 p-6 md:p-8">
@@ -157,38 +228,51 @@ const AvailabilitySettings = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="text-xl font-bold text-base-content mb-3 block flex items-center gap-2">
-                    <Clock className="w-6 h-6 text-primary" />
-                    Start Time
-                  </label>
-                  <input
-                    type="time"
-                    value={formData.startTime}
-                    onChange={(e) => setFormData({...formData, startTime: e.target.value})}
-                    className="w-full px-5 py-4 bg-base-200 border border-base-300 rounded-xl text-base-content text-lg focus:outline-none focus:border-primary transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="text-xl font-bold text-base-content mb-3 block">End Time</label>
-                  <input
-                    type="time"
-                    value={formData.endTime}
-                    onChange={(e) => setFormData({...formData, endTime: e.target.value})}
-                    className="w-full px-5 py-4 bg-base-200 border border-base-300 rounded-xl text-base-content text-lg focus:outline-none focus:border-primary transition-all"
-                  />
-                </div>
-              </div>
+              <TimeSelector
+                label="Start Time"
+                icon={Clock}
+                hourValue={formData.startHour}
+                minuteValue={formData.startMinute}
+                periodValue={formData.startPeriod}
+                onHourChange={(val) => setFormData({...formData, startHour: val})}
+                onMinuteChange={(val) => setFormData({...formData, startMinute: val})}
+                onPeriodChange={(val) => setFormData({...formData, startPeriod: val})}
+              />
+
+              <TimeSelector
+                label="End Time"
+                hourValue={formData.endHour}
+                minuteValue={formData.endMinute}
+                periodValue={formData.endPeriod}
+                onHourChange={(val) => setFormData({...formData, endHour: val})}
+                onMinuteChange={(val) => setFormData({...formData, endMinute: val})}
+                onPeriodChange={(val) => setFormData({...formData, endPeriod: val})}
+              />
 
               <div>
                 <label className="text-xl font-bold text-base-content mb-3 block flex items-center gap-2">
                   <Coffee className="w-6 h-6 text-accent" />
                   Break Time (Optional)
                 </label>
-                <div className="grid grid-cols-2 gap-6">
-                  <input type="time" placeholder="Start" value={formData.breakStart} onChange={(e) => setFormData({...formData, breakStart: e.target.value})} className="px-5 py-4 bg-base-200 border border-base-300 rounded-xl text-base-content text-lg focus:border-accent" />
-                  <input type="time" placeholder="End" value={formData.breakEnd} onChange={(e) => setFormData({...formData, breakEnd: e.target.value})} className="px-5 py-4 bg-base-200 border border-base-300 rounded-xl text-base-content text-lg focus:border-accent" />
+                <div className="space-y-4">
+                  <TimeSelector
+                    label="Break Start"
+                    hourValue={formData.breakStartHour}
+                    minuteValue={formData.breakStartMinute}
+                    periodValue={formData.breakStartPeriod}
+                    onHourChange={(val) => setFormData({...formData, breakStartHour: val})}
+                    onMinuteChange={(val) => setFormData({...formData, breakStartMinute: val})}
+                    onPeriodChange={(val) => setFormData({...formData, breakStartPeriod: val})}
+                  />
+                  <TimeSelector
+                    label="Break End"
+                    hourValue={formData.breakEndHour}
+                    minuteValue={formData.breakEndMinute}
+                    periodValue={formData.breakEndPeriod}
+                    onHourChange={(val) => setFormData({...formData, breakEndHour: val})}
+                    onMinuteChange={(val) => setFormData({...formData, breakEndMinute: val})}
+                    onPeriodChange={(val) => setFormData({...formData, breakEndPeriod: val})}
+                  />
                 </div>
               </div>
 
@@ -216,7 +300,7 @@ const AvailabilitySettings = () => {
               <button
                 onClick={handleSaveAvailability}
                 disabled={saving}
-                className="w-full py-5 bg-gradient-to-r from-primary via-secondary to-accent text-white font-black text-2xl rounded-2xl hover:shadow-2xl hover:shadow-primary/50 transition-all duration-300 flex items-center justify-center gap-4"
+                className="w-full py-5 bg-gradient-to-r from-primary via-secondary to-accent text-white font-black text-2xl rounded-2xl hover:shadow-2xl hover:shadow-primary/50 transition-all duration-300 flex items-center justify-center gap-4 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Saving...' : (
                   <>
