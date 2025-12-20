@@ -27,10 +27,13 @@ router.get('/available-slots/:interviewerId', async (req, res) => {
 });
 
 // Book interview
+
 router.post('/book', async (req, res) => {
   try {
     const data = req.body;
     const roomId = uuidv4();
+
+    console.log('📝 Booking data received:', data); // ADD THIS
 
     const endTime = moment.tz(data.scheduledTime, data.timezone).add(data.duration, 'minutes').toDate();
 
@@ -47,17 +50,29 @@ router.post('/book', async (req, res) => {
       duration: data.duration,
       interviewType: data.interviewType,
       timezone: data.timezone,
-      meetingLink: `${process.env.CLIENT_URL}/interview/join/${roomId}`
+      meetingLink: `${process.env.CLIENT_URL || 'http://localhost:5173'}/interview/join/${roomId}` // ADD FALLBACK
     });
 
-   
+    console.log('✅ Interview created:', interview._id); // ADD THIS
 
-    await sendBookingConfirmationEmails(interview.toObject());
+    // Wrap email in try-catch to prevent booking failure
+    try {
+      await sendBookingConfirmationEmails(interview.toObject());
+      console.log('✅ Emails sent successfully'); // ADD THIS
+    } catch (emailError) {
+      console.error('❌ Email error (booking still successful):', emailError); // ADD THIS
+      // Don't fail the booking if email fails
+    }
 
     res.json({ success: true, interview });
   } catch (error) {
-    console.error('Booking error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error('❌ Booking error:', error); // ENHANCE THIS
+    console.error('Error stack:', error.stack); // ADD THIS
+    res.status(500).json({ 
+      success: false, 
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined // ADD THIS
+    });
   }
 });
 
