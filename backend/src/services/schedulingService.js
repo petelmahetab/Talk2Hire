@@ -24,7 +24,7 @@ export const getAvailableSlots = async (interviewerId, date, timezone = 'UTC') =
   // Parse the date in the INTERVIEWER'S timezone
   const targetDate = moment.tz(date, interviewerTimezone).startOf('day');
   const dayOfWeek = targetDate.day(); // 0=Sun, 6=Sat
-  dayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek;
+  // dayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek;
   
   console.log('📅 Target date:', targetDate.format('YYYY-MM-DD'), 'Day:', dayOfWeek);
 
