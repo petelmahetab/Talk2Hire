@@ -2,12 +2,19 @@ import nodemailer from 'nodemailer';
 import moment from 'moment-timezone';
 
 const transporter = nodemailer.createTransport({
-  service: process.env.EMAIL_SERVICE || 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,              // SSL port (most secure)
+  secure: true,           // true for port 465
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
+    pass: process.env.EMAIL_PASSWORD  // Your 16-char App Password (NO SPACES!)
+  },
+  // Optional but helps avoid rare cert issues on some hosts
+  tls: {
+    rejectUnauthorized: false
   }
 });
+
 
 export const sendBookingConfirmationEmails = async (interview) => {
   try {
