@@ -42,9 +42,9 @@ const AvailabilitySettings = () => {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
   });
 
-  // Generate hours (1-12) and minutes (00-59)
+  // Generate hours (1-12) and minutes (00, 15, 30, 45) - easier for users
   const hours = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
-  const minutes = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+  const minutes = ['00', '15', '30', '45']; // Changed to 15-min intervals
 
   useEffect(() => {
     if (user) fetchAvailabilities();
@@ -63,7 +63,7 @@ const AvailabilitySettings = () => {
     }
   };
 
-  // Convert 12-hour to 24-hour format
+  // Convert 12-hour to 24-hour format (FIXED)
   const convertTo24Hour = (hour, minute, period) => {
     let h = parseInt(hour);
     if (period === 'PM' && h !== 12) h += 12;
@@ -71,7 +71,7 @@ const AvailabilitySettings = () => {
     return `${String(h).padStart(2, '0')}:${minute}`;
   };
 
-  // Convert 24-hour to 12-hour format for display
+  // Convert 24-hour to 12-hour format for display (FIXED)
   const formatTime = (time) => {
     if (!time) return '';
     const [hours, minutes] = time.split(':');
@@ -82,13 +82,29 @@ const AvailabilitySettings = () => {
   };
 
   const handleSaveAvailability = async () => {
+    // Validation
+    if (!formData.startHour || !formData.startMinute || !formData.endHour || !formData.endMinute) {
+      toast.error('Please select start and end times');
+      return;
+    }
+
     setSaving(true);
     try {
       const startTime = convertTo24Hour(formData.startHour, formData.startMinute, formData.startPeriod);
       const endTime = convertTo24Hour(formData.endHour, formData.endMinute, formData.endPeriod);
       
+      // Validate that end time is after start time
+      const startMinutes = parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1]);
+      const endMinutes = parseInt(endTime.split(':')[0]) * 60 + parseInt(endTime.split(':')[1]);
+      
+      if (endMinutes <= startMinutes) {
+        toast.error('End time must be after start time');
+        setSaving(false);
+        return;
+      }
+
       let breakTime = { start: null, end: null };
-      if (formData.breakStartHour && formData.breakEndHour) {
+      if (formData.breakStartHour && formData.breakEndHour && formData.breakStartMinute && formData.breakEndMinute) {
         breakTime = {
           start: convertTo24Hour(formData.breakStartHour, formData.breakStartMinute, formData.breakStartPeriod),
           end: convertTo24Hour(formData.breakEndHour, formData.breakEndMinute, formData.breakEndPeriod)
@@ -104,16 +120,20 @@ const AvailabilitySettings = () => {
         breakTime,
         interviewDuration: parseInt(formData.interviewDuration),
         bufferMinutes: parseInt(formData.bufferMinutes),
-        timezone: formData.timezone
+        timezone: formData.timezone,
+        isActive: true // Explicitly set to true
       };
+
+      console.log('📤 Sending availability data:', availabilityData);
 
       const response = await schedulingApi.setAvailability(availabilityData);
       if (response.success) {
-        toast.success('Availability saved successfully!');
+        toast.success('✅ Availability saved successfully!');
         fetchAvailabilities();
+        
+        // Reset break times only
         setFormData({ 
           ...formData, 
-          dayOfWeek: (formData.dayOfWeek + 1) % 7,
           breakStartHour: '',
           breakStartMinute: '',
           breakEndHour: '',
@@ -121,6 +141,7 @@ const AvailabilitySettings = () => {
         });
       }
     } catch (error) {
+      console.error('❌ Save error:', error);
       toast.error('Failed to save availability');
     } finally {
       setSaving(false);
@@ -128,29 +149,29 @@ const AvailabilitySettings = () => {
   };
 
   const handleDeleteAvailability = async (id) => {
-    if (!window.confirm('Delete this slot?')) return;
+    if (!window.confirm('Delete this availability slot?')) return;
     try {
       const response = await schedulingApi.deleteAvailability(id);
       if (response.success) {
-        toast.success('Slot deleted');
+        toast.success('✅ Slot deleted');
         fetchAvailabilities();
       }
     } catch (error) {
-      toast.error('Failed to delete');
+      toast.error('❌ Failed to delete');
     }
   };
 
   const TimeSelector = ({ label, hourValue, minuteValue, periodValue, onHourChange, onMinuteChange, onPeriodChange, icon: Icon }) => (
     <div>
-      <label className="text-xl font-bold text-base-content mb-3 block flex items-center gap-2">
-        {Icon && <Icon className="w-6 h-6 text-primary" />}
+      <label className="text-lg font-bold text-base-content mb-3 block flex items-center gap-2">
+        {Icon && <Icon className="w-5 h-5 text-primary" />}
         {label}
       </label>
       <div className="flex gap-2">
         <select
           value={hourValue}
           onChange={(e) => onHourChange(e.target.value)}
-          className="flex-1 px-4 py-4 bg-base-200 border border-base-300 rounded-xl text-base-content text-lg focus:outline-none focus:border-primary transition-all"
+          className="flex-1 px-4 py-3 bg-base-200 border border-base-300 rounded-xl text-base-content text-lg focus:outline-none focus:border-primary transition-all"
         >
           <option value="">HH</option>
           {hours.map(h => <option key={h} value={h}>{h}</option>)}
@@ -159,7 +180,7 @@ const AvailabilitySettings = () => {
         <select
           value={minuteValue}
           onChange={(e) => onMinuteChange(e.target.value)}
-          className="flex-1 px-4 py-4 bg-base-200 border border-base-300 rounded-xl text-base-content text-lg focus:outline-none focus:border-primary transition-all"
+          className="flex-1 px-4 py-3 bg-base-200 border border-base-300 rounded-xl text-base-content text-lg focus:outline-none focus:border-primary transition-all"
         >
           <option value="">MM</option>
           {minutes.map(m => <option key={m} value={m}>{m}</option>)}
@@ -167,7 +188,7 @@ const AvailabilitySettings = () => {
         <select
           value={periodValue}
           onChange={(e) => onPeriodChange(e.target.value)}
-          className="px-4 py-4 bg-base-200 border border-base-300 rounded-xl text-base-content text-lg font-bold focus:outline-none focus:border-primary transition-all"
+          className="px-4 py-3 bg-base-200 border border-base-300 rounded-xl text-base-content text-lg font-bold focus:outline-none focus:border-primary transition-all"
         >
           <option value="AM">AM</option>
           <option value="PM">PM</option>
@@ -216,12 +237,12 @@ const AvailabilitySettings = () => {
                       <button
                         key={day.value}
                         onClick={() => setFormData({...formData, dayOfWeek: day.value})}
-                        className={`py-5 rounded-xl font-bold transition-all ${formData.dayOfWeek === day.value 
+                        className={`py-4 rounded-xl font-bold transition-all ${formData.dayOfWeek === day.value 
                           ? 'bg-gradient-to-r from-primary via-secondary to-accent text-white shadow-xl' 
                           : 'bg-base-200 text-base-content/70 hover:bg-base-300'}`}
                       >
-                        <Icon className="w-8 h-8 mx-auto mb-2" />
-                        <span className="text-sm">{day.label}</span>
+                        <Icon className="w-6 h-6 mx-auto mb-2" />
+                        <span className="text-xs">{day.label}</span>
                       </button>
                     );
                   })}
@@ -241,6 +262,7 @@ const AvailabilitySettings = () => {
 
               <TimeSelector
                 label="End Time"
+                icon={Clock}
                 hourValue={formData.endHour}
                 minuteValue={formData.endMinute}
                 periodValue={formData.endPeriod}
@@ -248,6 +270,25 @@ const AvailabilitySettings = () => {
                 onMinuteChange={(val) => setFormData({...formData, endMinute: val})}
                 onPeriodChange={(val) => setFormData({...formData, endPeriod: val})}
               />
+
+              {/* Preview */}
+              <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
+                <p className="text-sm font-bold text-primary mb-1">Preview:</p>
+                <p className="text-lg font-bold">
+                  {formData.startHour && formData.startMinute ? 
+                    `${formData.startHour}:${formData.startMinute} ${formData.startPeriod}` : '--:-- --'} 
+                  {' → '}
+                  {formData.endHour && formData.endMinute ? 
+                    `${formData.endHour}:${formData.endMinute} ${formData.endPeriod}` : '--:-- --'}
+                </p>
+                <p className="text-sm text-base-content/70 mt-1">
+                  Stored as: {formData.startHour && formData.startMinute ? 
+                    convertTo24Hour(formData.startHour, formData.startMinute, formData.startPeriod) : '--:--'} 
+                  {' to '}
+                  {formData.endHour && formData.endMinute ? 
+                    convertTo24Hour(formData.endHour, formData.endMinute, formData.endPeriod) : '--:--'}
+                </p>
+              </div>
 
               <div>
                 <label className="text-xl font-bold text-base-content mb-3 block flex items-center gap-2">
@@ -278,8 +319,8 @@ const AvailabilitySettings = () => {
 
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="text-xl font-bold text-base-content mb-3 block">Interview Duration</label>
-                  <select value={formData.interviewDuration} onChange={(e) => setFormData({...formData, interviewDuration: e.target.value})} className="w-full px-5 py-4 bg-base-200 border border-base-300 rounded-xl text-base-content text-lg focus:border-primary">
+                  <label className="text-lg font-bold text-base-content mb-3 block">Interview Duration</label>
+                  <select value={formData.interviewDuration} onChange={(e) => setFormData({...formData, interviewDuration: e.target.value})} className="w-full px-4 py-3 bg-base-200 border border-base-300 rounded-xl text-base-content text-lg focus:border-primary">
                     <option value="30">30 minutes</option>
                     <option value="45">45 minutes</option>
                     <option value="60">1 hour</option>
@@ -287,8 +328,8 @@ const AvailabilitySettings = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xl font-bold text-base-content mb-3 block">Buffer Time</label>
-                  <select value={formData.bufferMinutes} onChange={(e) => setFormData({...formData, bufferMinutes: e.target.value})} className="w-full px-5 py-4 bg-base-200 border border-base-300 rounded-xl text-base-content text-lg focus:border-primary">
+                  <label className="text-lg font-bold text-base-content mb-3 block">Buffer Time</label>
+                  <select value={formData.bufferMinutes} onChange={(e) => setFormData({...formData, bufferMinutes: e.target.value})} className="w-full px-4 py-3 bg-base-200 border border-base-300 rounded-xl text-base-content text-lg focus:border-primary">
                     <option value="0">No buffer</option>
                     <option value="10">10 minutes</option>
                     <option value="15">15 minutes</option>
@@ -300,11 +341,11 @@ const AvailabilitySettings = () => {
               <button
                 onClick={handleSaveAvailability}
                 disabled={saving}
-                className="w-full py-5 bg-gradient-to-r from-primary via-secondary to-accent text-white font-black text-2xl rounded-2xl hover:shadow-2xl hover:shadow-primary/50 transition-all duration-300 flex items-center justify-center gap-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-4 bg-gradient-to-r from-primary via-secondary to-accent text-white font-black text-xl rounded-2xl hover:shadow-2xl hover:shadow-primary/50 transition-all duration-300 flex items-center justify-center gap-4 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Saving...' : (
                   <>
-                    <CheckCircle2 className="w-8 h-8" />
+                    <CheckCircle2 className="w-7 h-7" />
                     SAVE AVAILABILITY
                   </>
                 )}
@@ -324,7 +365,8 @@ const AvailabilitySettings = () => {
             ) : availabilities.length === 0 ? (
               <div className="text-center py-20">
                 <Calendar className="w-24 h-24 mx-auto mb-6 text-base-content/30" />
-                <p className="text-3xl font-bold text-base-content/60">No availability set yet</p>
+                <p className="text-2xl font-bold text-base-content/60">No availability set yet</p>
+                <p className="text-base-content/50 mt-2">Add your first slot to get started!</p>
               </div>
             ) : (
               <div className="space-y-6">
@@ -337,28 +379,30 @@ const AvailabilitySettings = () => {
                     <div key={day.value} className="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl p-6 border border-primary/20">
                       <div className="flex items-center gap-4 mb-4">
                         <div className="p-3 bg-gradient-to-r from-primary via-secondary to-accent rounded-xl shadow-xl">
-                          <Icon className="w-8 h-8 text-white" />
+                          <Icon className="w-7 h-7 text-white" />
                         </div>
                         <h3 className="text-2xl font-bold text-base-content">{day.label}</h3>
                       </div>
-                      <div className="space-y-4 ml-14">
+                      <div className="space-y-3 ml-14">
                         {dayAvail.map(avail => (
-                          <div key={avail._id} className="bg-base-100 rounded-xl p-5 border border-base-300 hover:border-primary transition-all">
+                          <div key={avail._id} className="bg-base-100 rounded-xl p-4 border border-base-300 hover:border-primary transition-all">
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-4">
-                                <Clock className="w-7 h-7 text-primary" />
-                                <span className="text-xl font-bold text-base-content">
-                                  {formatTime(avail.startTime)} - {formatTime(avail.endTime)}
-                                </span>
-                                <span className="text-base-content/70">
-                                  ({avail.interviewDuration} min)
-                                </span>
+                              <div className="flex items-center gap-3">
+                                <Clock className="w-6 h-6 text-primary" />
+                                <div>
+                                  <span className="text-lg font-bold text-base-content">
+                                    {formatTime(avail.startTime)} - {formatTime(avail.endTime)}
+                                  </span>
+                                  <p className="text-sm text-base-content/60">
+                                    {avail.interviewDuration} min sessions · {avail.bufferMinutes} min buffer
+                                  </p>
+                                </div>
                               </div>
                               <button
                                 onClick={() => handleDeleteAvailability(avail._id)}
-                                className="p-3 bg-red-500/20 hover:bg-red-500/40 rounded-xl transition-all"
+                                className="p-2 bg-red-500/20 hover:bg-red-500/40 rounded-xl transition-all"
                               >
-                                <Trash2 className="w-6 h-6 text-red-400" />
+                                <Trash2 className="w-5 h-5 text-red-400" />
                               </button>
                             </div>
                           </div>
