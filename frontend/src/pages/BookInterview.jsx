@@ -96,44 +96,69 @@ const BookInterview = () => {
     }
   };
 
-  const handleBooking = async () => {
-    if (!selectedSlot) return toast.error('Please select a time slot');
-    if (!formData.candidateName || !formData.candidateEmail)
-      return toast.error('Name & Email are required');
+ // Update only the handleBooking function in BookInterview.jsx
 
-    // Validate phone number (should be +91 followed by 10 digits)
-    const phoneDigits = formData.candidatePhone.replace(/\D/g, '').slice(2); // Remove +91
-    if (formData.candidatePhone.trim() !== '+91' && phoneDigits.length > 0 && phoneDigits.length !== 10) {
-      return toast.error('Phone number must be 10 digits');
+const handleBooking = async () => {
+  if (!selectedSlot) return toast.error('Please select a time slot');
+  if (!formData.candidateName || !formData.candidateEmail)
+    return toast.error('Name & Email are required');
+
+  // Validate phone number
+  const phoneDigits = formData.candidatePhone.replace(/\D/g, '').slice(2);
+  if (formData.candidatePhone.trim() !== '+91' && phoneDigits.length > 0 && phoneDigits.length !== 10) {
+    return toast.error('Phone number must be 10 digits');
+  }
+
+  setLoading(true);
+  try {
+    const bookingData = {
+      interviewerId,
+      interviewerName: 'Mahetab Patel',
+      interviewerEmail: 'patelmahetab9020@gmail.com',
+      candidateName: formData.candidateName,
+      candidateEmail: formData.candidateEmail,
+      candidatePhone: formData.candidatePhone.trim() === '+91' ? '' : formData.candidatePhone,
+      scheduledTime: selectedSlot.start,
+      duration: selectedSlot.duration,
+      interviewType,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      notes: formData.notes
+    };
+
+    const res = await schedulingApi.bookInterview(bookingData);
+    
+    if (res.success) {
+      toast.success('🎉 Interview booked! Check your email.');
+      navigate('/my-interviews');
+    } else {
+      // ✅ Handle slot conflict error
+      if (res.message && res.message.includes('already been booked')) {
+        toast.error('⚠️ This slot was just booked by someone else. Please choose another time.');
+        // Refresh available slots
+        setSelectedSlot(null);
+        setStep(2);
+        await fetchAvailableSlots();
+      } else {
+        toast.error(res.message || 'Booking failed');
+      }
     }
-
-    setLoading(true);
-    try {
-      const bookingData = {
-        interviewerId,
-        interviewerName: 'Mahetab Patel',
-        interviewerEmail: 'patelmahetab9020@gmail.com',
-        candidateName: formData.candidateName,
-        candidateEmail: formData.candidateEmail,
-        candidatePhone: formData.candidatePhone.trim() === '+91' ? '' : formData.candidatePhone,
-        scheduledTime: selectedSlot.start,
-        duration: selectedSlot.duration,
-        interviewType,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        notes: formData.notes
-      };
-
-      const res = await schedulingApi.bookInterview(bookingData);
-      if (res.success) {
-        toast.success('🎉 Interview booked! Check your email.');
-        navigate('/my-interviews');
-      } else toast.error(res.message || 'Booking failed');
-    } catch (err) {
-      toast.error('Something went wrong');
-    } finally {
-      setLoading(false);
+  } catch (err) {
+    console.error('Booking error:', err);
+    
+    // ✅ Handle 409 Conflict status
+    if (err.response?.status === 409) {
+      toast.error('⚠️ This slot is no longer available. Refreshing slots...');
+      setSelectedSlot(null);
+      setStep(2);
+      await fetchAvailableSlots();
+    } else {
+      toast.error('Something went wrong. Please try again.');
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
+  
 
   return (
     <div className="min-h-screen bg-base-200">
