@@ -5,14 +5,18 @@ import moment from 'moment-timezone';
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 465,
-  secure: true, // SSL
+  secure: true,  // SSL
   auth: {
-    user: process.env.EMAIL_USER,
+    user: process.env.EMAIL_USER, 
     pass: process.env.EMAIL_PASSWORD 
   },
   tls: {
-    rejectUnauthorized: false // Helps on Render
-  }
+    rejectUnauthorized: false  
+  },
+  // Optional: Increase timeout
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 10000
 });
 
 // ✅ Test email connection on startup
