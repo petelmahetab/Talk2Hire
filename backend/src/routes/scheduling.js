@@ -2,7 +2,7 @@ import express from 'express';
 import InterviewSchedule from '../models/InterviewSchedule.js';
 import InterviewerAvailability from '../models/InterviewerAvailability.js';
 import Session from '../models/Session.js';
-import { getAvailableSlots } from '../services/schedulingService.js';
+import { getAvailableSlots, isSlotAvailable } from '../services/schedulingService.js';
 // import { sendInterviewConfirmationEmail } from '../services/emailService.js';
 import { sendBookingConfirmationEmails } from '../utils/sendEmails.js';
 import { v4 as uuidv4 } from 'uuid';
