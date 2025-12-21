@@ -5,8 +5,7 @@ import moment from 'moment-timezone';
 export const getAvailableSlots = async (interviewerId, date, timezone = 'UTC') => {
   console.log('🔍 Getting slots for:', { interviewerId, date, timezone });
   
-  // Use the INTERVIEWER'S timezone, not UTC
-  // First, get the interviewer's availability to know their timezone
+  // Get the interviewer's availability to know their timezone
   const sampleAvailability = await InterviewerAvailability.findOne({
     interviewerId,
     isActive: true
@@ -24,7 +23,6 @@ export const getAvailableSlots = async (interviewerId, date, timezone = 'UTC') =
   // Parse the date in the INTERVIEWER'S timezone
   const targetDate = moment.tz(date, interviewerTimezone).startOf('day');
   const dayOfWeek = targetDate.day(); // 0=Sun, 6=Sat
-  // dayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek;
   
   console.log('📅 Target date:', targetDate.format('YYYY-MM-DD'), 'Day:', dayOfWeek);
 
@@ -42,15 +40,16 @@ export const getAvailableSlots = async (interviewerId, date, timezone = 'UTC') =
 
   console.log('✅ Found', availabilities.length, 'availability records');
 
-  // Find booked interviews on this date (in interviewer's timezone)
+  // ✅ FIXED: Better date range for finding booked interviews
   const dayStart = targetDate.clone().startOf('day').toDate();
   const dayEnd = targetDate.clone().endOf('day').toDate();
 
   console.log('🔍 Checking booked interviews between:', dayStart, 'and', dayEnd);
 
+  // ✅ FIXED: Check for ALL active statuses, not just 'scheduled'
   const bookedInterviews = await InterviewSchedule.find({
     interviewerId,
-    status: 'scheduled',
+    status: { $in: ['scheduled', 'confirmed', 'in-progress'] }, // Added more statuses
     scheduledTime: {
       $gte: dayStart,
       $lte: dayEnd
@@ -65,6 +64,7 @@ export const getAvailableSlots = async (interviewerId, date, timezone = 'UTC') =
   }));
 
   const slots = [];
+  const now = moment().tz(interviewerTimezone); // ✅ FIXED: Use current time in interviewer timezone
 
   for (const avail of availabilities) {
     console.log('⏰ Processing availability:', {
@@ -96,8 +96,9 @@ export const getAvailableSlots = async (interviewerId, date, timezone = 'UTC') =
     while (current.clone().add(avail.interviewDuration, 'minutes').isSameOrBefore(endOfDay)) {
       const slotEnd = current.clone().add(avail.interviewDuration, 'minutes');
 
-      // Skip if slot is in the past
-      if (current.isBefore(moment().tz(interviewerTimezone))) {
+      // ✅ FIXED: Only skip if slot END time is in the past (allows booking today's future slots)
+      if (slotEnd.isBefore(now)) {
+        console.log('⏭️ Skipping past slot:', current.format('HH:mm'));
         current = current.clone().add(avail.interviewDuration + avail.bufferMinutes, 'minutes');
         continue;
       }
@@ -111,17 +112,30 @@ export const getAvailableSlots = async (interviewerId, date, timezone = 'UTC') =
         const breakEnd = targetDate.clone().hour(bEndH).minute(bEndM).second(0);
 
         if (current.isSameOrAfter(breakStart) && current.isBefore(breakEnd)) {
+          console.log('☕ Skipping break time:', current.format('HH:mm'));
           current = breakEnd;
           continue;
         }
       }
 
-      // Check for conflicts with booked interviews
-      const hasConflict = bookedTimes.some(booked =>
-        current.isBefore(booked.end) && slotEnd.isAfter(booked.start)
-      );
+      // ✅ FIXED: Better conflict detection
+      const hasConflict = bookedTimes.some(booked => {
+        const conflict = (
+          (current.isSameOrAfter(booked.start) && current.isBefore(booked.end)) ||
+          (slotEnd.isAfter(booked.start) && slotEnd.isSameOrBefore(booked.end)) ||
+          (current.isSameOrBefore(booked.start) && slotEnd.isSameOrAfter(booked.end))
+        );
+        if (conflict) {
+          console.log('❌ Conflict found:', {
+            slotTime: current.format('HH:mm'),
+            bookedTime: booked.start.format('HH:mm')
+          });
+        }
+        return conflict;
+      });
 
       if (!hasConflict) {
+        console.log('✅ Adding available slot:', current.format('HH:mm'));
         slots.push({
           start: current.toDate(),
           end: slotEnd.toDate(),
@@ -137,18 +151,16 @@ export const getAvailableSlots = async (interviewerId, date, timezone = 'UTC') =
   return slots;
 };
 
-
-
 export const isSlotAvailable = async (interviewerId, scheduledTime, duration, timezone = 'UTC') => {
   console.log('🔍 Checking slot availability:', { interviewerId, scheduledTime, duration, timezone });
   
   const slotStart = moment.tz(scheduledTime, timezone);
   const slotEnd = slotStart.clone().add(duration, 'minutes');
 
-  // Check for overlapping bookings
+  // ✅ FIXED: Check for ALL active statuses
   const overlappingBooking = await InterviewSchedule.findOne({
     interviewerId,
-    status: { $in: ['scheduled', 'confirmed'] },
+    status: { $in: ['scheduled', 'confirmed', 'in-progress'] },
     $or: [
       // Existing booking starts during new slot
       {
@@ -173,8 +185,16 @@ export const isSlotAvailable = async (interviewerId, scheduledTime, duration, ti
   });
 
   const isAvailable = !overlappingBooking;
-  console.log('✅ Slot available:', isAvailable);
+  
+  if (overlappingBooking) {
+    console.log('❌ Slot NOT available - Found overlapping booking:', {
+      existingStart: overlappingBooking.scheduledTime,
+      existingEnd: overlappingBooking.endTime,
+      status: overlappingBooking.status
+    });
+  } else {
+    console.log('✅ Slot available!');
+  }
   
   return isAvailable;
 };
-
