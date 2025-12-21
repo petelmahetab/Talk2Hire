@@ -1,20 +1,25 @@
 import nodemailer from 'nodemailer';
 import moment from 'moment-timezone';
 
+// ✅ FIXED: Better Gmail configuration
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,              // SSL port (most secure)
-  secure: true,           // true for port 465
+  service: 'gmail', // Use 'gmail' service (handles all SMTP settings)
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD  // Your 16-char App Password (NO SPACES!)
-  },
-  // Optional but helps avoid rare cert issues on some hosts
-  tls: {
-    rejectUnauthorized: false
+    pass: process.env.EMAIL_PASSWORD  // MUST be 16-character App Password (no spaces!)
   }
 });
 
+// ✅ Test email connection on startup
+transporter.verify(function (error, success) {
+  if (error) {
+    console.log('❌ Email connection error:', error);
+    console.log('📧 EMAIL_USER:', process.env.EMAIL_USER ? 'Set ✓' : '❌ MISSING');
+    console.log('📧 EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD ? 'Set ✓ (length: ' + process.env.EMAIL_PASSWORD.length + ')' : '❌ MISSING');
+  } else {
+    console.log('✅ Email server is ready to send messages');
+  }
+});
 
 export const sendBookingConfirmationEmails = async (interview) => {
   try {
@@ -138,7 +143,7 @@ export const sendBookingConfirmationEmails = async (interview) => {
       code: error.code,
       response: error.response
     });
-    throw error; // Re-throw so the route handler can catch it
+    throw error;
   }
 };
 
@@ -148,9 +153,7 @@ export const sendInterviewConfirmationEmail = async (to, interview, recipientTyp
   const recipientName = isCandidate ? interview.candidateName : interview.interviewerName;
   const recipientTimezone = isCandidate ? interview.candidateTimezone : interview.interviewerTimezone;
 
-  // Fallback to interview.timezone if individual not set
   const displayTimezone = recipientTimezone || interview.timezone || 'Asia/Kolkata';
-
   const localTime = moment(interview.scheduledTime).tz(displayTimezone);
 
   const mailOptions = {
