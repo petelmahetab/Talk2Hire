@@ -3,10 +3,15 @@ import moment from 'moment-timezone';
 
 // ✅ FIXED: Better Gmail configuration
 const transporter = nodemailer.createTransport({
-  service: 'gmail', // Use 'gmail' service (handles all SMTP settings)
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // SSL
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD  // MUST be 16-character App Password (no spaces!)
+    user: process.env.EMAIL_USER, // patelmahetab9020@gmail.com
+    pass: process.env.EMAIL_PASSWORD // Fresh 16-char no spaces
+  },
+  tls: {
+    rejectUnauthorized: false // Helps on Render
   }
 });
 
