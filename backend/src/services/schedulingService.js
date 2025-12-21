@@ -136,3 +136,45 @@ export const getAvailableSlots = async (interviewerId, date, timezone = 'UTC') =
   console.log('✅ Generated', slots.length, 'available slots');
   return slots;
 };
+
+
+
+export const isSlotAvailable = async (interviewerId, scheduledTime, duration, timezone = 'UTC') => {
+  console.log('🔍 Checking slot availability:', { interviewerId, scheduledTime, duration, timezone });
+  
+  const slotStart = moment.tz(scheduledTime, timezone);
+  const slotEnd = slotStart.clone().add(duration, 'minutes');
+
+  // Check for overlapping bookings
+  const overlappingBooking = await InterviewSchedule.findOne({
+    interviewerId,
+    status: { $in: ['scheduled', 'confirmed'] },
+    $or: [
+      // Existing booking starts during new slot
+      {
+        scheduledTime: {
+          $gte: slotStart.toDate(),
+          $lt: slotEnd.toDate()
+        }
+      },
+      // Existing booking ends during new slot
+      {
+        endTime: {
+          $gt: slotStart.toDate(),
+          $lte: slotEnd.toDate()
+        }
+      },
+      // Existing booking completely covers new slot
+      {
+        scheduledTime: { $lte: slotStart.toDate() },
+        endTime: { $gte: slotEnd.toDate() }
+      }
+    ]
+  });
+
+  const isAvailable = !overlappingBooking;
+  console.log('✅ Slot available:', isAvailable);
+  
+  return isAvailable;
+};
+
