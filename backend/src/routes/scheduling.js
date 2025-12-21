@@ -72,20 +72,25 @@ router.post('/book', async (req, res) => {
       meetingLink: `${process.env.CLIENT_URL || 'http://localhost:5173'}/interview/join/${roomId}`
     });
 
-    console.log('✅ Interview created:', interview._id);
+   console.log('✅ Interview created:', interview._id);
 
-    // Send emails (wrapped in try-catch to not fail booking if email fails)
-    try {
-      await sendBookingConfirmationEmails(interview.toObject());
-      console.log('✅ Emails sent successfully');
-    } catch (emailError) {
-      console.error('❌ Email error (booking still successful):', emailError);
-      console.error('Email error details:', {
-        message: emailError.message,
-        code: emailError.code,
-        response: emailError.response
-      });
-    }
+// ADD THIS:
+console.log('📧 EMAIL CONFIG CHECK:');
+console.log('EMAIL_USER:', process.env.EMAIL_USER ? 'Set ✓' : '❌ Missing');
+console.log('EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD ? `Set ✓ (${process.env.EMAIL_PASSWORD.length} chars)` : '❌ Missing');
+
+// Send emails (wrapped in try-catch to not fail booking if email fails)
+try {
+  await sendBookingConfirmationEmails(interview.toObject());
+  console.log('✅ Emails sent successfully');
+} catch (emailError) {
+  console.error('❌ Email error (booking still successful):', emailError);
+  console.error('Email error details:', {
+    message: emailError.message,
+    code: emailError.code,
+    response: emailError.response
+  });
+}
 
     res.json({ success: true, interview });
   } catch (error) {
