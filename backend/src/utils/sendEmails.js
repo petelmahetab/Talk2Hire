@@ -35,7 +35,11 @@ export const sendBookingConfirmationEmails = async (interview) => {
       html: candidateEmailTemplate(interview, candidateTime),
     });
 
-    console.log('✅ Candidate email sent! ID:', candidateResult.id);
+    console.log('✅ Candidate email sent!', candidateResult);
+    
+    if (candidateResult.error) {
+      throw new Error(`Candidate email failed: ${candidateResult.error.message}`);
+    }
 
     // Send email to Interviewer
     console.log('📨 Sending to interviewer...');
@@ -47,13 +51,18 @@ export const sendBookingConfirmationEmails = async (interview) => {
       html: interviewerEmailTemplate(interview, interviewerTime),
     });
 
-    console.log('✅ Interviewer email sent! ID:', interviewerResult.id);
+    console.log('✅ Interviewer email sent!', interviewerResult);
+    
+    if (interviewerResult.error) {
+      throw new Error(`Interviewer email failed: ${interviewerResult.error.message}`);
+    }
+    
     console.log('✅ All emails sent successfully!');
 
     return {
       success: true,
-      candidateEmailId: candidateResult.id,
-      interviewerEmailId: interviewerResult.id
+      candidateEmailId: candidateResult.data?.id,
+      interviewerEmailId: interviewerResult.data?.id
     };
 
   } catch (error) {
