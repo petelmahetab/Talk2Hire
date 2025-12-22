@@ -1,34 +1,15 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import moment from 'moment-timezone';
 
-// ✅ FIXED: Better Gmail configuration
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,  // SSL
-  auth: {
-    user: process.env.EMAIL_USER, 
-    pass: process.env.EMAIL_PASSWORD 
-  },
-  tls: {
-    rejectUnauthorized: false  
-  },
-  // Optional: Increase timeout
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 10000
-});
+// Initialize Resend with your API key
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// ✅ Test email connection on startup
-transporter.verify(function (error, success) {
-  if (error) {
-    console.log('❌ Email connection error:', error);
-    console.log('📧 EMAIL_USER:', process.env.EMAIL_USER ? 'Set ✓' : '❌ MISSING');
-    console.log('📧 EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD ? 'Set ✓ (length: ' + process.env.EMAIL_PASSWORD.length + ')' : '❌ MISSING');
-  } else {
-    console.log('✅ Email server is ready to send messages');
-  }
-});
+// Test connection on startup
+if (process.env.RESEND_API_KEY) {
+  console.log('✅ Resend API key configured');
+} else {
+  console.log('❌ RESEND_API_KEY missing in environment variables');
+}
 
 export const sendBookingConfirmationEmails = async (interview) => {
   try {
@@ -44,8 +25,8 @@ export const sendBookingConfirmationEmails = async (interview) => {
 
     // Send email to candidate
     console.log('📨 Sending email to candidate:', interview.candidateEmail);
-    await transporter.sendMail({
-      from: `"Talk2Hire" <${process.env.EMAIL_USER}>`,
+    const candidateEmail = await resend.emails.send({
+      from: 'Talk2Hire <onboarding@resend.dev>', // Use your verified domain later
       to: interview.candidateEmail,
       subject: `🎉 Interview Confirmed - ${localTime.format('MMM Do [at] h:mm A')}`,
       html: `
@@ -86,12 +67,12 @@ export const sendBookingConfirmationEmails = async (interview) => {
       `
     });
 
-    console.log('✅ Candidate email sent successfully');
+    console.log('✅ Candidate email sent:', candidateEmail.id);
 
     // Send email to interviewer
     console.log('📨 Sending email to interviewer:', interview.interviewerEmail);
-    await transporter.sendMail({
-      from: `"Talk2Hire" <${process.env.EMAIL_USER}>`,
+    const interviewerEmail = await resend.emails.send({
+      from: 'Talk2Hire <onboarding@resend.dev>',
       to: interview.interviewerEmail,
       subject: `📅 New Interview Scheduled - ${localTime.format('MMM Do [at] h:mm A')}`,
       html: `
@@ -142,22 +123,26 @@ export const sendBookingConfirmationEmails = async (interview) => {
       `
     });
 
-    console.log('✅ Interviewer email sent successfully');
-    console.log('✅ All booking confirmation emails sent!');
+    console.log('✅ Interviewer email sent:', interviewerEmail.id);
+    console.log('✅ All booking confirmation emails sent successfully!');
+
+    return {
+      candidateEmailId: candidateEmail.id,
+      interviewerEmailId: interviewerEmail.id
+    };
 
   } catch (error) {
     console.error('❌ Error sending booking confirmation emails:', error);
     console.error('Error details:', {
       message: error.message,
-      code: error.code,
-      response: error.response
+      name: error.name,
+      statusCode: error.statusCode
     });
     throw error;
   }
 };
 
 export const sendInterviewConfirmationEmail = async (to, interview, recipientType) => {
-  
   const isCandidate = recipientType === 'candidate';
   const recipientName = isCandidate ? interview.candidateName : interview.interviewerName;
   const recipientTimezone = isCandidate ? interview.candidateTimezone : interview.interviewerTimezone;
@@ -165,8 +150,8 @@ export const sendInterviewConfirmationEmail = async (to, interview, recipientTyp
   const displayTimezone = recipientTimezone || interview.timezone || 'Asia/Kolkata';
   const localTime = moment(interview.scheduledTime).tz(displayTimezone);
 
-  const mailOptions = {
-    from: `"Talk2Hire" <${process.env.EMAIL_USER}>`,
+  const { data, error } = await resend.emails.send({
+    from: 'Talk2Hire <onboarding@resend.dev>',
     to,
     subject: `Mock Interview Confirmed - ${localTime.format('dddd, MMM Do [at] h:mm A z')}`,
     html: `
@@ -211,17 +196,21 @@ export const sendInterviewConfirmationEmail = async (to, interview, recipientTyp
         <p style="color: #6b7280;">See you soon!<br/><strong>— The Talk2Hire Team</strong></p>
       </div>
     `
-  };
+  });
 
-  await transporter.sendMail(mailOptions);
+  if (error) {
+    throw error;
+  }
+
+  return data;
 };
 
 export const sendReminderEmail = async (to, name, interview, minutesBefore = 5) => {
   const recipientTimezone = interview.candidateTimezone || interview.interviewerTimezone || interview.timezone;
   const time = moment(interview.scheduledTime).tz(recipientTimezone);
 
-  await transporter.sendMail({
-    from: `"Talk2Hire" <${process.env.EMAIL_USER}>`,
+  const { data, error } = await resend.emails.send({
+    from: 'Talk2Hire <onboarding@resend.dev>',
     to,
     subject: `⏰ Reminder: Mock Interview in ${minutesBefore} minutes!`,
     html: `
@@ -249,4 +238,10 @@ export const sendReminderEmail = async (to, name, interview, minutesBefore = 5) 
       </div>
     `
   });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
 };
