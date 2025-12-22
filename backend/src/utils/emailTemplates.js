@@ -12,142 +12,180 @@ const brandText = '#1f2937';
 const brandMuted = '#6b7280';
 
 
-export const candidateEmailTemplate = (interview, localTime) => `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your Interview is Confirmed</title>
-  <style>
-    body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; background:#f9fafb; margin:0; padding:20px; line-height:1.6; color:${brandText}; }
-    .container { max-width: 600px; margin:30px auto; background:white; border-radius:12px; overflow:hidden; box-shadow:0 10px 25px rgba(0,0,0,0.05); border:1px solid ${brandBorder}; }
-    .header { background:${brandBlue}; color:white; padding:36px 24px; text-align:center; }
-    .header h1 { margin:0; font-size:26px; font-weight:600; }
-    .header p { margin:10px 0 0; font-size:17px; opacity:0.95; }
-    .content { padding:40px 32px; }
-    .details-box { background:${brandGray}; border-radius:10px; padding:28px; text-align:center; margin:24px 0; border:1px solid ${brandBorder}; }
-    .time { font-size:34px; font-weight:700; color:${brandBlue}; margin:16px 0; }
-    .btn {
-      display:inline-block;
-      background:${brandGreen};
-      color:white !important;
-      padding:16px 40px;
-      border-radius:8px;
-      font-weight:600;
-      font-size:18px;
-      text-decoration:none;
-      box-shadow:0 6px 16px rgba(22,163,74,0.3);
-      margin:24px 0;
-      transition: background 0.3s;
-    }
-    .btn:hover { background:${brandLightGreen}; }
-    .tip { background:#f0fdf4; border-left:4px solid ${brandGreen}; padding:18px; border-radius:6px; color:#166534; font-size:15px; margin-top:32px; }
-    .footer { text-align:center; padding:32px 20px; color:${brandMuted}; font-size:14px; border-top:1px solid ${brandBorder}; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>Interview Confirmed</h1>
-      <p>with ${interview.interviewerName}</p>
-    </div>
 
-    <div class="content">
-      <div class="details-box">
-        <p style="margin:0; font-size:17px; color:${brandMuted};"><strong>Date</strong></p>
-        <p style="margin:8px 0 20px; font-size:20px; font-weight:600;">${localTime.format('dddd, MMMM Do, YYYY')}</p>
+export const candidateEmailTemplate = (interview, candidateTime) => {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background-color: #f3f4f6;">
+      <div style="max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
         
-        <p class="time">${localTime.format('h:mm A')}</p>
-        <p style="margin:8px 0; font-size:17px; color:${brandMuted};">${localTime.format('z')} time zone</p>
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 24px; text-align: center;">
+          <h1 style="color: #ffffff; font-size: 28px; margin: 0;">Interview Confirmed! 🎉</h1>
+        </div>
+
+        <!-- Content -->
+        <div style="padding: 32px 24px;">
+          <p style="font-size: 18px; color: #1f2937; margin-bottom: 16px;">
+            Hello <strong>${interview.candidateName.split(' ')[0]}</strong> 👋
+          </p>
+          
+          <p style="font-size: 16px; color: #374151; margin-bottom: 24px;">
+            Your mock interview with <strong>${interview.interviewerName}</strong> is confirmed!
+          </p>
+
+          <!-- Interview Details Box -->
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px; border-radius: 12px; margin: 24px 0;">
+            <p style="margin: 8px 0; font-size: 16px;">
+              <strong>📅 Date:</strong> ${candidateTime.format('dddd, MMMM Do, YYYY')}
+            </p>
+            <p style="margin: 8px 0; font-size: 16px;">
+              <strong>🕐 Time:</strong> ${candidateTime.format('h:mm A')} 
+              <span style="font-size: 14px; opacity: 0.9;">(${interview.timezone || 'IST'})</span>
+            </p>
+            <p style="margin: 8px 0; font-size: 16px;">
+              <strong>⏱ Duration:</strong> ${interview.duration} minutes
+            </p>
+            <p style="margin: 8px 0; font-size: 16px;">
+              <strong>💼 Type:</strong> ${interview.interviewType.toUpperCase()}
+            </p>
+          </div>
+
+          <!-- Join Button -->
+          ${interview.meetingLink ? `
+            <div style="text-align: center; margin: 32px 0;">
+              <a href="${interview.meetingLink}" 
+                 style="display: inline-block; background: #10b981; color: white; padding: 16px 40px; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 18px;">
+                Join Interview Room 🚀
+              </a>
+            </div>
+          ` : ''}
+
+          <hr style="border: none; border-top: 1px dashed #e5e7eb; margin: 32px 0;">
+
+          <!-- Tips -->
+          <div style="background: #f0f9ff; padding: 16px; border-left: 4px solid #0ea5e9; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 0; color: #0c4a6e; font-size: 14px;">
+              <strong>💡 Pro Tip:</strong> Join 5-10 minutes early to test your microphone and camera!
+            </p>
+          </div>
+
+          <p style="color: #6b7280; font-size: 14px; margin-top: 24px;">
+            Good luck! 🍀<br/>
+            <strong>— The Talk2Hire Team</strong>
+          </p>
+        </div>
+
+        <!-- Footer -->
+        <div style="background: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+          <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+            This email was sent by Talk2Hire. If you didn't book this interview, please ignore this email.
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+};
+
+export const interviewerEmailTemplate = (interview, interviewerTime) => {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background-color: #f3f4f6;">
+      <div style="max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
         
-        <p style="margin:16px 0 0;"><strong>Duration:</strong> ${interview.duration} minutes</p>
-        <p><strong>Type:</strong> ${interview.interviewType.charAt(0).toUpperCase() + interview.interviewType.slice(1)} Interview</p>
-      </div>
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 40px 24px; text-align: center;">
+          <h1 style="color: #ffffff; font-size: 28px; margin: 0;">New Interview Scheduled 📅</h1>
+        </div>
 
-      <div style="text-align:center;">
-        <a href="${interview.meetingLink}" class="btn">Join Interview Room</a>
-      </div>
+        <!-- Content -->
+        <div style="padding: 32px 24px;">
+          <p style="font-size: 18px; color: #1f2937; margin-bottom: 16px;">
+            Hello <strong>${interview.interviewerName.split(' ')[0]}</strong> 👋
+          </p>
+          
+          <p style="font-size: 16px; color: #374151; margin-bottom: 24px;">
+            You have a new mock interview scheduled with <strong>${interview.candidateName}</strong>!
+          </p>
 
-      <div class="tip">
-        <strong>Pro Tip:</strong> Join 5–10 minutes early to test your mic, camera, and internet connection.
-      </div>
+          <!-- Candidate Info Box -->
+          <div style="background: #f0f9ff; padding: 20px; border-radius: 12px; margin: 24px 0; border-left: 4px solid #0ea5e9;">
+            <h3 style="margin: 0 0 12px 0; color: #0c4a6e; font-size: 16px;">Candidate Information</h3>
+            <p style="margin: 6px 0; color: #0c4a6e;">
+              <strong>👤 Name:</strong> ${interview.candidateName}
+            </p>
+            <p style="margin: 6px 0; color: #0c4a6e;">
+              <strong>📧 Email:</strong> ${interview.candidateEmail}
+            </p>
+            ${interview.candidatePhone ? `
+              <p style="margin: 6px 0; color: #0c4a6e;">
+                <strong>📱 Phone:</strong> ${interview.candidatePhone}
+              </p>
+            ` : ''}
+          </div>
 
-      <div class="footer">
-        Best of luck — you've got this!<br>
-      <span style="font-size:18px; font-weight:600;color:${brandBlue};">${interview.interviewerName.split(' ')[0]} & The Talk2Hire Team</span>
-      </div>
-    </div>
-  </div>
-</body>
-</html>
-`;
+          <!-- Interview Details Box -->
+          <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; padding: 24px; border-radius: 12px; margin: 24px 0;">
+            <p style="margin: 8px 0; font-size: 16px;">
+              <strong>📅 Date:</strong> ${interviewerTime.format('dddd, MMMM Do, YYYY')}
+            </p>
+            <p style="margin: 8px 0; font-size: 16px;">
+              <strong>🕐 Time:</strong> ${interviewerTime.format('h:mm A')}
+              <span style="font-size: 14px; opacity: 0.9;">(${interview.timezone || 'IST'})</span>
+            </p>
+            <p style="margin: 8px 0; font-size: 16px;">
+              <strong>⏱ Duration:</strong> ${interview.duration} minutes
+            </p>
+            <p style="margin: 8px 0; font-size: 16px;">
+              <strong>💼 Type:</strong> ${interview.interviewType.toUpperCase()}
+            </p>
+          </div>
 
-export const interviewerEmailTemplate = (interview, localTime) => `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>New Interview Scheduled</title>
-  <style>
-    body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; background:#f9fafb; margin:0; padding:20px; line-height:1.6; color:${brandText}; }
-    .container { max-width: 600px; margin:30px auto; background:white; border-radius:12px; overflow:hidden; box-shadow:0 10px 25px rgba(0,0,0,0.05); border:1px solid ${brandBorder}; }
-    .header { background:${brandBlue}; color:white; padding:36px 24px; text-align:center; }
-    .header h1 { margin:0; font-size:24px; font-weight:600; }
-    .content { padding:40px 32px; }
-    .info { background:#f8fafc; border-radius:10px; padding:24px; margin:24px 0; border:1px solid ${brandBorder}; }
-    .info p { margin:10px 0; font-size:16px; }
-    .details-box { background:${brandGray}; border-radius:10px; padding:28px; text-align:center; margin:24px 0; }
-    .time { font-size:32px; font-weight:700; color:${brandBlue}; margin:16px 0; }
-    .btn {
-      display:inline-block;
-      background:${brandBlue};
-      color:white !important;
-      padding:16px 40px;
-      border-radius:8px;
-      font-weight:600;
-      font-size:18px;
-      text-decoration:none;
-      box-shadow:0 6px 16px rgba(37,99,235,0.3);
-    }
-    .footer { text-align:center; padding:32px 20px; color:${brandMuted}; font-size:14px; border-top:1px solid ${brandBorder}; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>New Interview Scheduled</h1>
-    </div>
+          ${interview.notes ? `
+            <div style="background: #fef3c7; padding: 16px; border-left: 4px solid #f59e0b; border-radius: 8px; margin: 20px 0;">
+              <p style="margin: 0; color: #92400e;">
+                <strong>📝 Notes:</strong> ${interview.notes}
+              </p>
+            </div>
+          ` : ''}
 
-    <div class="content">
-      <div class="info">
-        <p><strong>Candidate:</strong> ${interview.candidateName}</p>
-        <p><strong>Email:</strong> ${interview.candidateEmail}</p>
-        ${interview.candidatePhone ? `<p><strong>Phone:</strong> ${interview.candidatePhone}</p>` : ''}
-        ${interview.notes ? `
-        <div style="margin-top:16px; padding:16px; background:white; border-radius:8px; border-left:4px solid ${brandBlue}; font-size:15px;">
-          <strong>Notes from candidate:</strong><br><br>${interview.notes.replace(/\n/g, '<br>')}
-        </div>` : ''}
-      </div>
+          <!-- Join Button -->
+          ${interview.meetingLink ? `
+            <div style="text-align: center; margin: 32px 0;">
+              <a href="${interview.meetingLink}" 
+                 style="display: inline-block; background: #10b981; color: white; padding: 16px 40px; text-decoration: none; border-radius: 12px; font-weight: bold; font-size: 18px;">
+                Join Interview Room 🚀
+              </a>
+            </div>
+          ` : ''}
 
-      <div class="details-box">
-        <p style="margin:0; color:${brandMuted};"><strong>Date & Time</strong></p>
-        <p class="time">${localTime.format('h:mm A z')}</p>
-        <p style="margin:12px 0 0; font-size:19px; font-weight:600;">${localTime.format('dddd, MMMM Do, YYYY')}</p>
-        <p style="margin:16px 0 0;"><strong>Duration:</strong> ${interview.duration} minutes • ${interview.interviewType.toUpperCase()}</p>
-      </div>
+          <hr style="border: none; border-top: 1px dashed #e5e7eb; margin: 32px 0;">
 
-      <div style="text-align:center;">
-        <a href="${interview.meetingLink}" class="btn">Open Interview Room</a>
-      </div>
+          <p style="color: #6b7280; font-size: 14px; margin-top: 24px;">
+            Get ready to evaluate! 💪<br/>
+            <strong>— The Talk2Hire Team</strong>
+          </p>
+        </div>
 
-      <div class="footer">
-        Thank you for helping candidates grow<br>
-        <span style="font-size:18px; font-weight:600;color:${brandBlue};">Talk2Hire Platform</span>
+        <!-- Footer -->
+        <div style="background: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+          <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+            Reply to this email to contact the candidate directly.
+          </p>
+        </div>
       </div>
-    </div>
-  </div>
-</body>
-</html>
-`;
+    </body>
+    </html>
+  `;
+};
