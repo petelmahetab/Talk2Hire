@@ -17,6 +17,8 @@ const app = express();
 app.use(express.json());
 app.set('trust proxy', 1);
 
+// Recove Password SendGrid new emailService' D22FZ9FCQ8UZ287J1F16Y1RU]
+
 // Logging middleware
 app.use((req, res, next) => {
   console.log('📍', req.method, req.url);
