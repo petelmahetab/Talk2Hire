@@ -76,8 +76,7 @@ router.post('/book', async (req, res) => {
 
 // ADD THIS:
 console.log('📧 EMAIL CONFIG CHECK:');
-console.log('EMAIL_USER:', process.env.EMAIL_USER ? 'Set ✓' : '❌ Missing');
-console.log('EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD ? `Set ✓ (${process.env.EMAIL_PASSWORD.length} chars)` : '❌ Missing');
+console.log('RESEND_API_KEY:', process.env.RESEND_API_KEY ? 'Set ✓' : '❌ Missing');
 
 // Send emails (wrapped in try-catch to not fail booking if email fails)
 try {
