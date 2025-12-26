@@ -1,4 +1,4 @@
-<h1 align="center">✨ Full-Stack Interview Platform ✨</h1>
+<h1 align="center">✨ Talk2Hire Platform ✨</h1>
 
 ![Demo App]
 
