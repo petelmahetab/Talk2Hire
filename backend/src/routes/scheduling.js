@@ -28,7 +28,7 @@ router.get('/available-slots/:interviewerId', async (req, res) => {
 
 // Book interview
 
-// Book interview - UPDATED VERSION
+// Book interview - FIXED VERSION
 router.post('/book', async (req, res) => {
   try {
     const data = req.body;
@@ -36,7 +36,7 @@ router.post('/book', async (req, res) => {
 
     console.log('📝 Booking data received:', data);
 
-    // ✅ CHECK IF SLOT IS STILL AVAILABLE BEFORE BOOKING
+    // Check if slot is still available
     const isAvailable = await isSlotAvailable(
       data.interviewerId,
       data.scheduledTime,
@@ -68,35 +68,44 @@ router.post('/book', async (req, res) => {
       duration: data.duration,
       interviewType: data.interviewType,
       timezone: data.timezone,
-      status: 'scheduled', // ✅ Set initial status
+      status: 'scheduled',
       meetingLink: `${process.env.CLIENT_URL || 'http://localhost:5173'}/interview/join/${roomId}`
     });
 
-   console.log('✅ Interview created:', interview._id);
+    console.log('✅ Interview created:', interview._id);
+    
+    // ✅ RESEND CONFIG CHECK
+    console.log('📧 Resend API Key:', process.env.RESEND_API_KEY ? 'Configured ✓' : '❌ MISSING!');
 
-// ADD THIS:
-console.log('📧 EMAIL CONFIG CHECK:');
-console.log('RESEND_API_KEY:', process.env.RESEND_API_KEY ? 'Set ✓' : '❌ Missing');
+    // Send booking confirmation emails
+    try {
+      console.log('📧 Sending emails to:', {
+        candidate: interview.candidateEmail,
+        interviewer: interview.interviewerEmail
+      });
+      
+      const emailResult = await sendBookingConfirmationEmails(interview.toObject());
+      
+      console.log('✅ Emails sent successfully:', emailResult);
+    } catch (emailError) {
+      console.error('❌ Email sending failed:', emailError);
+      console.error('Error details:', {
+        message: emailError.message,
+        statusCode: emailError.statusCode,
+        name: emailError.name
+      });
+    
+    }
 
-// Send emails (wrapped in try-catch to not fail booking if email fails)
-try {
-  await sendBookingConfirmationEmails(interview.toObject());
-  console.log('✅ Emails sent successfully');
-} catch (emailError) {
-  console.error('❌ Email error (booking still successful):', emailError);
-  console.error('Email error details:', {
-    message: emailError.message,
-    code: emailError.code,
-    response: emailError.response
-  });
-}
+    res.json({ 
+      success: true, 
+      interview,
+      message: 'INTERVIEW HAS BEEN BOOKED..! CHECK YOUR EMAIL'
+    });
 
-    res.json({ success: true, interview });
   } catch (error) {
     console.error('❌ Booking error:', error);
-    console.error('Error stack:', error.stack);
     
-    // Handle duplicate booking error
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
@@ -106,12 +115,10 @@ try {
 
     res.status(500).json({
       success: false,
-      message: error.message,
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      message: error.message
     });
   }
 });
-
 
 
 // // Get my interviews
