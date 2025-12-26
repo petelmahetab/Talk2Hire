@@ -1,23 +1,15 @@
-import nodemailer from 'nodemailer';
+import sgMail from '@sendgrid/mail';
 import moment from 'moment-timezone';
 
-// Create Gmail transporter
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
-  }
-});
+// Initialize SendGrid
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-// Test connection on startup
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('❌ Email service error:', error);
-  } else {
-    console.log('✅ Email service ready');
-  }
-});
+// Test configuration on startup
+if (process.env.SENDGRID_API_KEY) {
+  console.log('✅ SendGrid API key configured');
+} else {
+  console.log('❌ SENDGRID_API_KEY missing in environment variables');
+}
 
 export const sendBookingConfirmationEmails = async (interview) => {
   try {
@@ -31,10 +23,12 @@ export const sendBookingConfirmationEmails = async (interview) => {
     const displayTimezone = interview.timezone || 'Asia/Kolkata';
     const localTime = moment(interview.scheduledTime).tz(displayTimezone);
 
-    // Send email to candidate
-    console.log('📨 Sending email to candidate:', interview.candidateEmail);
-    await transporter.sendMail({
-      from: `"Talk2Hire" <${process.env.EMAIL_USER}>`,
+    // Email to candidate
+    const candidateEmail = {
+      from: {
+        email: 'patelmahetab9020@gmail.com',
+        name: 'Talk2Hire'
+      },
       to: interview.candidateEmail,
       subject: `🎉 Interview Confirmed - ${localTime.format('MMM Do [at] h:mm A')}`,
       html: `
@@ -73,14 +67,14 @@ export const sendBookingConfirmationEmails = async (interview) => {
           <p style="color: #6b7280;">See you soon!<br/><strong>— The Talk2Hire Team</strong></p>
         </div>
       `
-    });
+    };
 
-    console.log('✅ Candidate email sent');
-
-    // Send email to interviewer
-    console.log('📨 Sending email to interviewer:', interview.interviewerEmail);
-    await transporter.sendMail({
-      from: `"Talk2Hire" <${process.env.EMAIL_USER}>`,
+    // Email to interviewer
+    const interviewerEmail = {
+      from: {
+        email: 'patelmahetab9020@gmail.com',
+        name: 'Talk2Hire'
+      },
       to: interview.interviewerEmail,
       subject: `📅 New Interview Scheduled - ${localTime.format('MMM Do [at] h:mm A')}`,
       html: `
@@ -129,15 +123,26 @@ export const sendBookingConfirmationEmails = async (interview) => {
           <p style="color: #6b7280;">See you soon!<br/><strong>— The Talk2Hire Team</strong></p>
         </div>
       `
-    });
+    };
 
+    // Send both emails
+    console.log('📨 Sending email to candidate:', interview.candidateEmail);
+    await sgMail.send(candidateEmail);
+    console.log('✅ Candidate email sent');
+
+    console.log('📨 Sending email to interviewer:', interview.interviewerEmail);
+    await sgMail.send(interviewerEmail);
     console.log('✅ Interviewer email sent');
+
     console.log('✅ All booking confirmation emails sent successfully!');
 
     return { success: true };
 
   } catch (error) {
     console.error('❌ Error sending booking confirmation emails:', error);
+    if (error.response) {
+      console.error('SendGrid error response:', error.response.body);
+    }
     throw error;
   }
 };
