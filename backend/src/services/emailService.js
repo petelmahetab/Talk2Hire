@@ -1,14 +1,14 @@
-import { Resend } from 'resend';
+import sgMail from '@sendgrid/mail';
 import moment from 'moment-timezone';
 
-// Initialize Resend with your API key
-const resend = new Resend(process.env.RESEND_API_KEY || 're_MB26WkJs_7ks5qgNHq7cre8LCjiL4RC4L');
+// Initialize SendGrid
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-// Test connection on startup
-if (process.env.RESEND_API_KEY) {
-  console.log('✅ Resend API key configured');
+// Test configuration on startup
+if (process.env.SENDGRID_API_KEY) {
+  console.log('✅ SendGrid API key configured');
 } else {
-  console.log('❌ RESEND_API_KEY missing in environment variables');
+  console.log('❌ SENDGRID_API_KEY missing in environment variables');
 }
 
 export const sendBookingConfirmationEmails = async (interview) => {
@@ -25,8 +25,11 @@ export const sendBookingConfirmationEmails = async (interview) => {
 
     // Send email to candidate
     console.log('📨 Sending email to candidate:', interview.candidateEmail);
-    const candidateEmail = await resend.emails.send({
-      from: 'Talk2Hire <onboarding@resend.dev>', // Use your verified domain later
+    await sgMail.send({
+      from: {
+        email: 'patelmahetab9020@gmail.com',
+        name: 'Talk2Hire'
+      },
       to: interview.candidateEmail,
       subject: `🎉 Interview Confirmed - ${localTime.format('MMM Do [at] h:mm A')}`,
       html: `
@@ -67,12 +70,15 @@ export const sendBookingConfirmationEmails = async (interview) => {
       `
     });
 
-    console.log('✅ Candidate email sent:', candidateEmail.id);
+    console.log('✅ Candidate email sent');
 
     // Send email to interviewer
     console.log('📨 Sending email to interviewer:', interview.interviewerEmail);
-    const interviewerEmail = await resend.emails.send({
-      from: 'Talk2Hire <onboarding@resend.dev>',
+    await sgMail.send({
+      from: {
+        email: 'patelmahetab9020@gmail.com',
+        name: 'Talk2Hire'
+      },
       to: interview.interviewerEmail,
       subject: `📅 New Interview Scheduled - ${localTime.format('MMM Do [at] h:mm A')}`,
       html: `
@@ -123,13 +129,10 @@ export const sendBookingConfirmationEmails = async (interview) => {
       `
     });
 
-    console.log('✅ Interviewer email sent:', interviewerEmail.id);
+    console.log('✅ Interviewer email sent');
     console.log('✅ All booking confirmation emails sent successfully!');
 
-    return {
-      candidateEmailId: candidateEmail.id,
-      interviewerEmailId: interviewerEmail.id
-    };
+    return { success: true };
 
   } catch (error) {
     console.error('❌ Error sending booking confirmation emails:', error);
@@ -150,8 +153,11 @@ export const sendInterviewConfirmationEmail = async (to, interview, recipientTyp
   const displayTimezone = recipientTimezone || interview.timezone || 'Asia/Kolkata';
   const localTime = moment(interview.scheduledTime).tz(displayTimezone);
 
-  const { data, error } = await resend.emails.send({
-    from: 'Talk2Hire <onboarding@resend.dev>',
+  await sgMail.send({
+    from: {
+      email: 'patelmahetab9020@gmail.com',
+      name: 'Talk2Hire'
+    },
     to,
     subject: `Mock Interview Confirmed - ${localTime.format('dddd, MMM Do [at] h:mm A z')}`,
     html: `
@@ -198,19 +204,18 @@ export const sendInterviewConfirmationEmail = async (to, interview, recipientTyp
     `
   });
 
-  if (error) {
-    throw error;
-  }
-
-  return data;
+  return { success: true };
 };
 
 export const sendReminderEmail = async (to, name, interview, minutesBefore = 5) => {
   const recipientTimezone = interview.candidateTimezone || interview.interviewerTimezone || interview.timezone;
   const time = moment(interview.scheduledTime).tz(recipientTimezone);
 
-  const { data, error } = await resend.emails.send({
-    from: 'Talk2Hire <onboarding@resend.dev>',
+  await sgMail.send({
+    from: {
+      email: 'patelmahetab9020@gmail.com',
+      name: 'Talk2Hire'
+    },
     to,
     subject: `⏰ Reminder: Mock Interview in ${minutesBefore} minutes!`,
     html: `
@@ -239,9 +244,5 @@ export const sendReminderEmail = async (to, name, interview, minutesBefore = 5) 
     `
   });
 
-  if (error) {
-    throw error;
-  }
-
-  return data;
+  return { success: true };
 };
