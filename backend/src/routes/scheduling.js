@@ -74,8 +74,7 @@ router.post('/book', async (req, res) => {
 
     console.log('✅ Interview created:', interview._id);
     
-    // ✅ RESEND CONFIG CHECK
-    console.log('📧 Resend API Key:', process.env.RESEND_API_KEY ? 'Configured ✓' : '❌ MISSING!');
+console.log('📧 SendGrid API Key:', process.env.SENDGRID_API_KEY ? 'Configured ✓' : '❌ MISSING!');
 
     // Send booking confirmation emails
     try {
