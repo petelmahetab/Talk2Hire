@@ -19,9 +19,9 @@ const InterviewJoin = () => {
         // console.log('🔄 Joining interview room:', roomId);
 
         const res = await axiosInstance.post(
-           `/api/interview-schedule/room/${roomId}/join`,
-          {},
-          { withCredentials: true }
+         `/interview-schedule/room/${roomId}/join`, 
+           {},
+         { withCredentials: true }
         );
 
         console.log('✅ Join response:', res.data);
