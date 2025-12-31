@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axiosInstance from '../lib/axios'; 
 import { Loader2, Clock, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -18,13 +18,13 @@ const InterviewJoin = () => {
       try {
         // console.log('🔄 Joining interview room:', roomId);
 
-        const res = await axios.post(
-          `/api/interview-schedule/room/${roomId}/join`,
+        const res = await axiosInstance.post(
+           `/api/interview-schedule/room/${roomId}/join`,
           {},
           { withCredentials: true }
         );
 
-        // console.log('✅ Join response:', res.data);
+        console.log('✅ Join response:', res.data);
 
         if (res.data.success && !cancelled) {
           const role = res.data.role;
