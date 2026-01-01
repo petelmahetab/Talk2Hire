@@ -78,38 +78,75 @@ function App() {
   return (
     <>
       <Routes>
-        {/* PUBLIC ROUTES */}
+        {/* PUBLIC HOME PAGE */}
         <Route
           path="/"
           element={!isSignedIn ? <HomePage /> : <Navigate to="/dashboard" replace />}
         />
 
-        {/* INTERVIEW JOIN (accessible via email link without login initially) */}
+        {/* ✅ INTERVIEW JOIN - MUST BE BEFORE OTHER ROUTES */}
         <Route path="/interview/join/:roomId" element={<InterviewJoin />} />
 
-        {/* PROTECTED ROUTES */}
+        {/* PROTECTED ROUTES - Each route explicitly defined */}
         <Route
-          path="/*"
-          element={
-            isSignedIn ? (
-              <Routes>
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/problems" element={<ProblemsPage />} />
-                <Route path="/problem/:id" element={<ProblemPage />} />
-                <Route path="/session/:id" element={<SessionPage />} />
-                <Route path="/mock-interview/:roomId" element={<MockInterviewSession />} />
-                <Route path="/book-interview/:interviewerId" element={<BookInterview />} />
-                <Route path="/my-interviews" element={<MyInterviews />} />
-                <Route path="/availability" element={<AvailabilitySettings />} />
-                <Route path="/schedule" element={<AvailabilitySettings />} />
-                <Route path="/room/:id" element={<RoomPage />} />
-                <Route path="/interviewers" element={<InterviewersPage />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
-              </Routes>
-            ) : (
-              <Navigate to="/" replace />
-            )
-          }
+          path="/dashboard"
+          element={isSignedIn ? <DashboardPage /> : <Navigate to="/" replace />}
+        />
+        
+        <Route
+          path="/problems"
+          element={isSignedIn ? <ProblemsPage /> : <Navigate to="/" replace />}
+        />
+        
+        <Route
+          path="/problem/:id"
+          element={isSignedIn ? <ProblemPage /> : <Navigate to="/" replace />}
+        />
+        
+        <Route
+          path="/session/:id"
+          element={isSignedIn ? <SessionPage /> : <Navigate to="/" replace />}
+        />
+        
+        <Route
+          path="/mock-interview/:roomId"
+          element={isSignedIn ? <MockInterviewSession /> : <Navigate to="/" replace />}
+        />
+        
+        <Route
+          path="/book-interview/:interviewerId"
+          element={isSignedIn ? <BookInterview /> : <Navigate to="/" replace />}
+        />
+        
+        <Route
+          path="/my-interviews"
+          element={isSignedIn ? <MyInterviews /> : <Navigate to="/" replace />}
+        />
+        
+        <Route
+          path="/availability"
+          element={isSignedIn ? <AvailabilitySettings /> : <Navigate to="/" replace />}
+        />
+        
+        <Route
+          path="/schedule"
+          element={isSignedIn ? <AvailabilitySettings /> : <Navigate to="/" replace />}
+        />
+        
+        <Route
+          path="/room/:id"
+          element={isSignedIn ? <RoomPage /> : <Navigate to="/" replace />}
+        />
+        
+        <Route
+          path="/interviewers"
+          element={isSignedIn ? <InterviewersPage /> : <Navigate to="/" replace />}
+        />
+
+        {/* CATCH-ALL 404 - MUST BE LAST */}
+        <Route
+          path="*"
+          element={isSignedIn ? <Navigate to="/dashboard" replace /> : <Navigate to="/" replace />}
         />
       </Routes>
 
