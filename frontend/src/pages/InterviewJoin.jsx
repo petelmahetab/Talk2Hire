@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useUser, SignIn } from '@clerk/clerk-react';
 import axiosInstance from '../lib/axios'; 
 import { Loader2, Clock, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -7,26 +8,36 @@ import toast from 'react-hot-toast';
 const InterviewJoin = () => {
   const { roomId } = useParams();
   const navigate = useNavigate();
+  const { isLoaded, isSignedIn, user } = useUser();
   const [error, setError] = useState(null);
 
   console.log("🎯 InterviewJoin MOUNTED!");
-  console.log("📍 roomId from URL:", roomId);
-  console.log("📍 Full params:", useParams());
+  console.log("📍 roomId:", roomId);
+  console.log("🔐 Auth Status:", { isLoaded, isSignedIn });
 
-  
   useEffect(() => {
+    // Wait for Clerk to load
+    if (!isLoaded) return;
+
+    // If not signed in, don't attempt to join yet
+    if (!isSignedIn) {
+      console.log("⏸️ User not signed in, waiting for authentication...");
+      return;
+    }
+
+    // Now user is authenticated, proceed with join
     let cancelled = false;
 
     const join = async () => {
       if (cancelled) return;
 
       try {
-        // console.log('🔄 Joining interview room:', roomId);
+        console.log('🔄 Joining interview room:', roomId);
 
         const res = await axiosInstance.post(
-         `/interview-schedule/room/${roomId}/join`, 
-           {},
-         { withCredentials: true }
+          `/interview-schedule/room/${roomId}/join`,
+          {},
+          { withCredentials: true }
         );
 
         console.log('✅ Join response:', res.data);
@@ -41,7 +52,6 @@ const InterviewJoin = () => {
             { duration: 3000 }
           );
 
-          // FIXED: Redirect to mock-interview page, not session page
           navigate(`/mock-interview/${roomId}?role=${role}`);
         }
       } catch (err) {
@@ -66,7 +76,6 @@ const InterviewJoin = () => {
           toast.error(msg, { id: 'join-error', duration: 4000 });
         }
 
-        // Redirect to dashboard after error
         setTimeout(() => {
           if (!cancelled) navigate('/dashboard');
         }, 3000);
@@ -78,8 +87,37 @@ const InterviewJoin = () => {
     return () => {
       cancelled = true;
     };
-  }, [roomId, navigate]);
+  }, [roomId, navigate, isLoaded, isSignedIn]);
 
+  // Show loading while Clerk initializes
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-black">
+        <Loader2 className="w-12 h-12 animate-spin text-purple-500" />
+      </div>
+    );
+  }
+
+  // Show sign-in if not authenticated
+  if (!isSignedIn) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-black relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-black to-cyan-900/20" />
+        
+        <div className="relative z-10 text-center p-8 bg-black/60 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl max-w-md">
+          <h2 className="text-3xl font-bold text-white mb-4">Sign In to Join Interview</h2>
+          <p className="text-gray-400 mb-6">Please sign in to access the interview room</p>
+          <SignIn 
+            routing="hash"
+            signUpUrl="/sign-up"
+            afterSignInUrl={`/interview/join/${roomId}`}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Rest of your existing UI for authenticated users
   return (
     <div className="flex items-center justify-center min-h-screen bg-black relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-black to-cyan-900/20" />
