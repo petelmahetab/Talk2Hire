@@ -9,6 +9,11 @@ const InterviewJoin = () => {
   const navigate = useNavigate();
   const [error, setError] = useState(null);
 
+  console.log("🎯 InterviewJoin MOUNTED!");
+  console.log("📍 roomId from URL:", roomId);
+  console.log("📍 Full params:", useParams());
+
+  
   useEffect(() => {
     let cancelled = false;
 
