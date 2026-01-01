@@ -89,34 +89,19 @@ function App() {
         {/* PUBLIC HOME PAGE */}
         <Route
           path="/"
-          element={
-            (() => {
-              console.log("🏠 Home route matched");
-              return !isSignedIn ? <HomePage /> : <Navigate to="/dashboard" replace />;
-            })()
-          }
+          element={!isSignedIn ? <HomePage /> : <Navigate to="/dashboard" replace />}
         />
 
         {/* ✅ INTERVIEW JOIN - CRITICAL ROUTE */}
         <Route
           path="/interview/join/:roomId"
-          element={
-            (() => {
-              console.log("🎯 INTERVIEW JOIN ROUTE MATCHED!");
-              return <InterviewJoin />;
-            })()
-          }
+          element={<InterviewJoin />}
         />
 
         {/* PROTECTED ROUTES */}
         <Route
           path="/dashboard"
-          element={
-            (() => {
-              console.log("📊 Dashboard route matched");
-              return isSignedIn ? <DashboardPage /> : <Navigate to="/" replace />;
-            })()
-          }
+          element={isSignedIn ? <DashboardPage /> : <Navigate to="/" replace />}
         />
         
         <Route
@@ -172,12 +157,7 @@ function App() {
         {/* CATCH-ALL 404 */}
         <Route
           path="*"
-          element={
-            (() => {
-              console.log("❌ CATCH-ALL 404 MATCHED - PATH:", location.pathname);
-              return isSignedIn ? <Navigate to="/dashboard" replace /> : <Navigate to="/" replace />;
-            })()
-          }
+          element={isSignedIn ? <Navigate to="/dashboard" replace /> : <Navigate to="/" replace />}
         />
       </Routes>
 
