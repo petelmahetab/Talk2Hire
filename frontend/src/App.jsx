@@ -1,5 +1,5 @@
 import { useUser } from "@clerk/clerk-react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { useEffect } from "react";
 import axiosInstance from "./lib/axios";
@@ -20,8 +20,16 @@ import InterviewersPage from "./pages/InterviewersPage";
 
 function App() {
   const { isSignedIn, isLoaded, user } = useUser();
+  const location = useLocation();
 
-  // ✅ CRITICAL: Setup global auth interceptor
+  // 🔍 LOG EVERY RENDER
+  console.log("🔄 APP RENDER:", {
+    pathname: location.pathname,
+    isLoaded,
+    isSignedIn,
+    userId: user?.id
+  });
+
   useEffect(() => {
     if (!isSignedIn || !user) {
       console.log("⏭️ User not signed in, skipping auth setup");
@@ -30,20 +38,16 @@ function App() {
 
     console.log("🔐 Setting up global auth interceptor for user:", user.id);
 
-    // Add request interceptor to inject auth token
     const requestInterceptor = axiosInstance.interceptors.request.use(
       async (config) => {
         try {
-          // ✅ TRY MULTIPLE METHODS to get token
           let token = null;
           
-          // Method 1: Direct from window.Clerk (most reliable)
           if (window.Clerk?.session) {
             token = await window.Clerk.session.getToken();
             console.log("✅ Got token from window.Clerk.session");
           }
           
-          // Method 2: Fallback to user object
           if (!token && typeof user.getToken === 'function') {
             token = await user.getToken();
             console.log("✅ Got token from user.getToken()");
@@ -66,14 +70,18 @@ function App() {
       }
     );
 
-    // Cleanup function to remove interceptor
     return () => {
       console.log("🧹 Cleaning up auth interceptor");
       axiosInstance.interceptors.request.eject(requestInterceptor);
     };
   }, [isSignedIn, user]);
 
-  if (!isLoaded) return null;
+  if (!isLoaded) {
+    console.log("⏳ Clerk not loaded yet, showing nothing");
+    return null;
+  }
+
+  console.log("🎨 Rendering routes...");
 
   return (
     <>
@@ -81,16 +89,34 @@ function App() {
         {/* PUBLIC HOME PAGE */}
         <Route
           path="/"
-          element={!isSignedIn ? <HomePage /> : <Navigate to="/dashboard" replace />}
+          element={
+            (() => {
+              console.log("🏠 Home route matched");
+              return !isSignedIn ? <HomePage /> : <Navigate to="/dashboard" replace />;
+            })()
+          }
         />
 
-        {/* ✅ INTERVIEW JOIN - MUST BE BEFORE OTHER ROUTES */}
-        <Route path="/interview/join/:roomId" element={<InterviewJoin />} />
+        {/* ✅ INTERVIEW JOIN - CRITICAL ROUTE */}
+        <Route
+          path="/interview/join/:roomId"
+          element={
+            (() => {
+              console.log("🎯 INTERVIEW JOIN ROUTE MATCHED!");
+              return <InterviewJoin />;
+            })()
+          }
+        />
 
-        {/* PROTECTED ROUTES - Each route explicitly defined */}
+        {/* PROTECTED ROUTES */}
         <Route
           path="/dashboard"
-          element={isSignedIn ? <DashboardPage /> : <Navigate to="/" replace />}
+          element={
+            (() => {
+              console.log("📊 Dashboard route matched");
+              return isSignedIn ? <DashboardPage /> : <Navigate to="/" replace />;
+            })()
+          }
         />
         
         <Route
@@ -143,10 +169,15 @@ function App() {
           element={isSignedIn ? <InterviewersPage /> : <Navigate to="/" replace />}
         />
 
-        {/* CATCH-ALL 404 - MUST BE LAST */}
+        {/* CATCH-ALL 404 */}
         <Route
           path="*"
-          element={isSignedIn ? <Navigate to="/dashboard" replace /> : <Navigate to="/" replace />}
+          element={
+            (() => {
+              console.log("❌ CATCH-ALL 404 MATCHED - PATH:", location.pathname);
+              return isSignedIn ? <Navigate to="/dashboard" replace /> : <Navigate to="/" replace />;
+            })()
+          }
         />
       </Routes>
 
