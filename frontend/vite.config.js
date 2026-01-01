@@ -32,5 +32,7 @@ export default defineConfig({
   },
 
   publicDir: 'public',
-
+ server: {
+    historyApiFallback: true  
+  }
 });
