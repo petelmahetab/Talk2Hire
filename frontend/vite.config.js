@@ -4,9 +4,9 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-
+  publicDir: 'public',  // ✅ Keeps this
   build: {
-    chunkSizeWarningLimit: 2000, // remove 500kb warnings
+    chunkSizeWarningLimit: 2000,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -18,10 +18,10 @@ export default defineConfig({
       },
     },
   },
-
   server: {
     port: 5173,
     host: true,
+    historyApiFallback: true,  // ✅ Added here
     proxy: {
       "/api": {
         target: "http://localhost:3000",
@@ -30,9 +30,4 @@ export default defineConfig({
       },
     },
   },
-
-  publicDir: 'public',
- server: {
-    historyApiFallback: true  
-  }
 });
