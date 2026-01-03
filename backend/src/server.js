@@ -11,9 +11,12 @@ import './jobs/reminderJobs.js';
 import schedulingRoutes from './routes/scheduling.js';
 import interviewersRoutes from './routes/interviewers.js';
 import interviewScheduleRoutes from './routes/interviewSchedule.routes.js';
+import path from "path";
 
 const app = express();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 app.use(express.json());
 app.set('trust proxy', 1);
 
