@@ -1,4 +1,6 @@
 import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
 import cors from "cors";
 import { serve } from "inngest/express";
 import { clerkMiddleware } from "@clerk/express";
@@ -11,14 +13,16 @@ import './jobs/reminderJobs.js';
 import schedulingRoutes from './routes/scheduling.js';
 import interviewersRoutes from './routes/interviewers.js';
 import interviewScheduleRoutes from './routes/interviewSchedule.routes.js';
-import path from "path";
 
 const app = express();
 
+// Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
 app.use(express.json());
 app.set('trust proxy', 1);
+
 
 // Recove Password SendGrid new emailService' D22FZ9FCQ8UZ287J1F16Y1RU]
 
