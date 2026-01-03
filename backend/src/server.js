@@ -71,7 +71,7 @@ app.get("/", (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
-app.use(express.static(path.join(__dirname, '../frontend/dist')));
+// app.use(express.static(path.join(__dirname, '../frontend/dist')));
 app.get("/health", (req, res) => {
   res.status(200).json({ msg: "api is up and running" });
 });
@@ -83,13 +83,13 @@ app.use('/api/scheduling', schedulingRoutes);
 app.use('/api', interviewersRoutes);
 app.use("/api/interview-schedule", interviewScheduleRoutes);
 
-// 404 handler
-app.get('*', (req, res) => {
-  if (req.path.startsWith('/api/')) {
-    return res.status(404).json({ error: 'API route not found' });
-  }
-  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
-});
+// // 404 handler
+// app.get('*', (req, res) => {
+//   if (req.path.startsWith('/api/')) {
+//     return res.status(404).json({ error: 'API route not found' });
+//   }
+//   res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+// });
 // Error handler
 app.use((err, req, res, next) => {
   console.error('💥 Error:', err.message);
