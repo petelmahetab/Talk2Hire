@@ -35,7 +35,7 @@ app.use((req, res, next) => {
 
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://talk2hire-f1kx.onrender.com'
+  'https://talk2hire-frontend.onrender.com'
 ];
 
 app.use(cors({
