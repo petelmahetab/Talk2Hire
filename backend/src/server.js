@@ -51,7 +51,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.options('/*', cors());
+
 
 // ✅ Apply Clerk middleware GLOBALLY - it will parse the token
 app.use(clerkMiddleware());
